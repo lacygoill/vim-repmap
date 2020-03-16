@@ -120,7 +120,7 @@ fu s:make_repeatable(m, mode, is_local, from) abort "{{{2
         try
             throw 'E8002:  [repeatable motion]  invalid motion: '.a:from
         catch
-            return lg#catch_error()
+            return lg#catch()
         endtry
     endif
 
@@ -483,7 +483,7 @@ fu repmap#make#all(what) abort "{{{2
         try
             throw 'E8000:  [repeatable motion]  missing key'
         catch
-            return lg#catch_error()
+            return lg#catch()
         endtry
     endif
 
@@ -575,7 +575,7 @@ fu s:collides_with_db(motion, repeatable_motions) abort "{{{2
                 throw printf('E8003:  [repeatable motion]  cannot process motion  %s : %s',
                 \             m.bwd.lhs, m.fwd.lhs)
             catch
-                call lg#catch_error()
+                call lg#catch()
             finally
                 return 1
             endtry
