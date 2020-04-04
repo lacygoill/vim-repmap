@@ -541,7 +541,7 @@ fu s:get_current_mode() abort "{{{2
     "
     "         same thing for operator-pending mode
     "}}}
-    return substitute(substitute(mode(1), "[vV\<c-v>]", 'x', ''), "no", 'o', '')
+    return substitute(substitute(mode(1), "[vV\<c-v>]", 'x', ''), "no[vV\<c-v>]\\=", 'o', '')
 endfu
 
 fu s:get_direction(lhs, motion) abort "{{{2
