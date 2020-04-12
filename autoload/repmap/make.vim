@@ -3,6 +3,25 @@ if exists('g:autoloaded_repmap#make')
 endif
 let g:autoloaded_repmap#make = 1
 
+" TODO: Try to include the original rhs in mappings whose rhs is `s:move()`.{{{
+" Just to be able to find a forgotten mapping more easily via fzf.
+"
+" Example:
+"
+"     <SNR>149_move('>t')
+"     →
+"     <SNR>149_move('>t', ":<c-u>call <sid>move_tabpage('-1')<cr>")
+"                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+"
+" Here, you  could find this forgotten  `>t` mapping more easily  via `:FzMaps`,
+" and typing `tabpage`.
+"}}}
+" TODO: Look for all locations where `repmap#make#all()` was invoked with the `''` mode.{{{
+"
+" Once you're  finished reviewing the  code in this  script, make sure  that all
+" those function calls work as expected.  Have a look at the qfl named `nvo`.
+"}}}
+
 " Init {{{1
 " Why not saving the last count to repeat it?{{{
 "
@@ -41,7 +60,7 @@ let s:KEYCODES =<< trim END
 END
 let s:KEYCODES = join(s:KEYCODES, '\|')
 
-let s:DEFAULT_MAPARG = {'buffer': 0, 'expr': 0, 'mode': ' ', 'noremap': 1, 'nowait': 0, 'silent': 0}
+let s:DEFAULT_MAPARG = {'buffer': 0, 'expr': 0, 'mode': ' ', 'noremap': 1, 'nowait': 0, 'silent': 0, 'script': 0}
 "                                                   Why? ┘{{{
 "
 " This  variable will  be  used  to populate  information  about a  built-in
@@ -67,16 +86,16 @@ let s:NON_RECURSIVE_MAPCMD = {
     \ '' : 'noremap',
     \ }
 
+" make sure `lg#map#...()` functions are available
+try
+    call lg#map#save('<c-a><c-b>', 'n')
+catch /^Vim\%((\a\+)\)\=:E117:/
+    throw 'E8000: [repmap] the vim-lg-lib dependency is missing'
+endtry
+
 " Interface {{{1
 fu repmap#make#all(what) abort "{{{2
     " can make several motions repeatable
-
-    " make sure `lg#map#...()` functions are available
-    try
-        call lg#map#save('<c-a><c-b>')
-    catch /^Vim\%((\a\+)\)\=:E117:/
-        throw 'E8000: [repmap] the vim-lg-lib dependency is missing'
-    endtry
 
     " sanitize input
     if sort(keys(a:what)) !=# ['buffer', 'from', 'mode', 'motions']
@@ -131,15 +150,16 @@ endfu
 fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
     " can only make ONE motion repeatable
 
-    let bwd_lhs    = a:m.bwd
-    let fwd_lhs    = a:m.fwd
+    let bwd_lhs = a:m.bwd
+    let fwd_lhs = a:m.fwd
     let bwd_maparg = s:maparg(bwd_lhs, a:mode, 0, 1)
     let fwd_maparg = s:maparg(fwd_lhs, a:mode, 0, 1)
+    " Don't bail out here if `s:maparg()` is empty.
+    " We could be working on some default command for which `maparg()` has no info.
 
     " if we ask for a local motion to be made repeatable,
     " the 2 lhs should be used in local mappings
-    if a:islocal
-    \ && (!get(bwd_maparg, 'buffer', 0) || !get(fwd_maparg, 'buffer', 0))
+    if a:islocal && (!get(bwd_maparg, 'buffer', 0) || !get(fwd_maparg, 'buffer', 0))
         throw 'E8002: [repmap] invalid motion: '..a:from
     endif
 
@@ -394,8 +414,9 @@ fu s:move_again(dir) abort "{{{2
         \ ..(motion[a:dir].nowait ? ' <nowait>' : '')
         \ ..(motion[a:dir].expr   ? ' <expr>'   : '')
         \ ..(motion[a:dir].silent ? ' <silent>' : '')
-        \ ..'  <plug>(repeat-motion-tmp)'
-        \ ..'  '..motion[a:dir].rhs
+        \ ..(!has('nvim') && motion[a:dir].script  ? ' <script> ' : '')
+        \ ..' <plug>(repeat-motion-tmp) '
+        \ ..motion[a:dir].rhs
 
     call feedkeys("\<plug>(repeat-motion-tmp)", 'i')
     "                                            │
@@ -566,7 +587,7 @@ fu s:get_mapcmd(mode, maparg) abort "{{{2
 
     let mapcmd ..= ' <expr>'
 
-    let mapcmd ..= join(map(['buffer', 'nowait', 'silent'],
+    let mapcmd ..= join(map(['buffer', 'nowait', 'silent', 'script'],
         \ {_,v -> get(a:maparg, v, 0) ? '<'..v..'>' : ''}))
 
     return mapcmd
@@ -657,6 +678,33 @@ endfu
 
 fu s:maparg(key, mode, abbr, dict) abort "{{{2
     let maparg = maparg(a:key, a:mode, a:abbr, a:dict)
+    " TODO: Explain the 2nd condition.{{{
+    "
+    " Update: For now, I've disabled the 2nd condition because it caused an issue.
+    "
+    "     press g;
+    "     press ;;;    Vim moves backward in the change list, instead of forward
+    "
+    " I  think the  issue comes  from the  fact that  we have  installed a  `g;`
+    " mapping in *normal* mode.  But we try to make it repeatable in `nvo` mode.
+    " It looks wrong...  Did we make a mistake when making `g;` repeatable?
+    " Did we make the same mistake elsewhere?
+    " Should our  plugin better  handle this kind  of mistake  (warning message,
+    " bail out, ...) to avoid any surprise?
+    "
+    " ---
+    "
+    " And explain the first condition.
+    " Without, when you press `g;`, you get:
+    "
+    "     Error detected while processing function <SNR>145_move[1]..<SNR>145_get_motion_info:~
+    "     line   36:~
+    "     E716: Key not present in Dictionary: lhs, m.fwd.lhs], a:lhs) >= 0 && index([mode, ' '], m.bwd.mode) >= 0~
+    "
+    " The error comes from `s:get_motion_info()` when it tries to evaluate `m.bwd.lhs`.
+    " Apparently, `m.bwd` has no `lhs` key.
+    "}}}
+    "     if empty(maparg) || a:mode == '' && maparg.mode != ' ' | return {} | endif
     if empty(maparg) | return {} | endif
     " Why do you overwrite the `rhs` key?  And why do you do re-invoke `maparg()` a second time?{{{
     "
