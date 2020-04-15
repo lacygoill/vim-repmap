@@ -3,25 +3,6 @@ if exists('g:autoloaded_repmap#make')
 endif
 let g:autoloaded_repmap#make = 1
 
-" TODO: Try to include the original rhs in mappings whose rhs is `s:move()`.{{{
-" Just to be able to find a forgotten mapping more easily via fzf.
-"
-" Example:
-"
-"     <SNR>149_move('>t')
-"     →
-"     <SNR>149_move('>t', ":<c-u>call <sid>move_tabpage('-1')<cr>")
-"                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-"
-" Here, you  could find this forgotten  `>t` mapping more easily  via `:FzMaps`,
-" and typing `tabpage`.
-"}}}
-" TODO: Look for all locations where `repmap#make#all()` was invoked with the `''` mode.{{{
-"
-" Once you're  finished reviewing the  code in this  script, make sure  that all
-" those function calls work as expected.  Have a look at the qfl named `nvo`.
-"}}}
-
 " Init {{{1
 " Why not saving the last count to repeat it?{{{
 "
@@ -94,7 +75,7 @@ catch /^Vim\%((\a\+)\)\=:E117:/
 endtry
 
 " Interface {{{1
-fu repmap#make#all(what) abort "{{{2
+fu repmap#make#repeatable(what) abort "{{{2
     " can make several motions repeatable
 
     " sanitize input
@@ -152,10 +133,13 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
 
     let bwd_lhs = a:m.bwd
     let fwd_lhs = a:m.fwd
-    let bwd_maparg = s:maparg(bwd_lhs, a:mode, 0, 1)
-    let fwd_maparg = s:maparg(fwd_lhs, a:mode, 0, 1)
-    " Don't bail out here if `s:maparg()` is empty.
-    " We could be working on some default command for which `maparg()` has no info.
+    let bwd_maparg = s:maparg(bwd_lhs, a:mode, 0, 1, a:from)
+    let fwd_maparg = s:maparg(fwd_lhs, a:mode, 0, 1, a:from)
+    " Don't bail out if `s:maparg()` is empty.
+    " We could be working on some default motion (`maparg()` has no info for that).
+    if type(bwd_maparg) != type({}) || type(fwd_maparg) != type({})
+        return
+    endif
 
     " if we ask for a local motion to be made repeatable,
     " the 2 lhs should be used in local mappings
@@ -247,7 +231,12 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
         return
     endif
 
-    call s:install_wrapper(a:mode, a:m, bwd_maparg)
+    call s:install_wrapper(a:mode,
+        \ a:m,
+        \ bwd_maparg,
+        \ motion.bwd.rhs,
+        \ motion.fwd.rhs
+        \ )
 
     " add the motion in a db, so that we can retrieve info about it later;
     " in particular its rhs
@@ -270,7 +259,12 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
     endif
 endfu
 
-fu s:move(lhs) abort "{{{2
+fu s:move(lhs, _) abort "{{{2
+"              ^{{{
+"              original rhs:
+"              only used to make the output of `:map` more readable,
+"              and still be able to find the mapping by looking for a keyword after running `:FzMaps`
+"}}}
     let motion = s:get_motion_info(a:lhs)
 
     " if for some reason, no motion in the db matches `a:lhs`
@@ -483,20 +477,20 @@ fu s:populate(motion, mode, lhs, is_fwd, maparg) abort "{{{2
     " has something readable to display
     let a:motion[dir].untranslated_lhs = a:motion[dir].lhs
 
-    " We now translate it to normalize its form.
-    " Why?{{{
+    " We now translate it to normalize its form.{{{
     "
-    " `a:motion[dir].lhs` comes from `repmap#make#all()`.
+    " `a:motion[dir].lhs` comes from `repmap#make#repeatable()`.
     " Its form depends on how the user wrote the motion.
     " Example:
-    "             Z<c-l>
-    "             Z<C-L>
+    "
+    "     Z<c-l>
+    "     Z<C-L>
     "
     " ... are different, but both describe the same keysequence.
     "
     " This difference  may cause an  issue later,  when we make  some comparison
     " between the lhs of a motion and some keysequence.
-    " We must make sure, we're always comparing the same (translated) form.
+    " We must make sure that we're always comparing the same (translated) form.
     "}}}
     let a:motion[dir].lhs = s:translate(a:motion[dir].lhs)
 endfu
@@ -522,7 +516,7 @@ fu s:collides_with_db(motion, repeatable_motions) abort "{{{2
     "
     " Besides:
     " Vim shouldn't make a motion repeatable twice (total collision).
-    " Because  it means  we  have a  useless  invocation of  `repmap#make#all()`
+    " Because  it means  we  have a  useless  invocation of  `repmap#make#repeatable()`
     " somewhere in our config; it should be removed.
     "
     " Vim shouldn't change the motion to which a lhs belongs (partial collision).
@@ -574,19 +568,17 @@ fu s:get_direction(lhs, motion) abort "{{{2
 endfu
 
 fu s:get_mapcmd(mode, maparg) abort "{{{2
-    "                 ┌ the value of the 'noremap' key stands for the NON-recursiveness
+    "                 ┌ the value of the 'noremap' key stands for the NON-recursiveness{{{
     "                 │ but we want a flag standing for the recursiveness
     "                 │ so we need to invert the value of the key
     "                 │
+    "                 │                         ┌ by default, we don't want
+    "                 │                         │ a recursive wrapper mapping
+    "                 │                         │}}}
     let isrecursive = !get(a:maparg, 'noremap', 1)
-    "                                           │
-    "                                           └ by default, we don't want
-    "                                             a recursive wrapper mapping
 
     let mapcmd = s:{isrecursive ? '' : 'NON_'}RECURSIVE_MAPCMD[a:mode]
-
     let mapcmd ..= ' <expr>'
-
     let mapcmd ..= join(map(['buffer', 'nowait', 'silent', 'script'],
         \ {_,v -> get(a:maparg, v, 0) ? '<'..v..'>' : ''}))
 
@@ -670,42 +662,97 @@ fu s:get_motion_info(lhs) abort "{{{2
     endfor
 endfu
 
-fu s:install_wrapper(mode, m, maparg) abort "{{{2
+fu s:install_wrapper(mode, m, maparg, orig_rhs_bwd, orig_rhs_fwd) abort "{{{2
+    " Why do you pass the original rhs of the mappings to `s:move()`?{{{
+    "
+    " `s:move()` doesn't need it.
+    " But it makes the output of `:map` more readable:
+    "
+    "     " wtf does this mapping?
+    "     n  >t          * <SNR>145_move('>t')
+    "
+    "     " ok, this mapping moves a tab page
+    "     n  >t          * <SNR>145_move('>t', ':<C-U>call <SNR>144_move_tabpage(''+1'')<CR>')
+    "
+    " And more  useful; without the  original rhs,  it's impossible to  find the
+    " `>t` mapping by  looking for the keyword "tab" or  "tabpage" after running
+    " `:FzMaps`.
+    "}}}
     let mapcmd = s:get_mapcmd(a:mode, a:maparg)
-    exe mapcmd..'  '..a:m.bwd..'  <sid>move('..string(a:m.bwd)..')'
-    exe mapcmd..'  '..a:m.fwd..'  <sid>move('..string(a:m.fwd)..')'
+    exe printf('%s %s <sid>move(%s, %s)', mapcmd, a:m.bwd, string(a:m.bwd), string(a:orig_rhs_bwd))
+    exe printf('%s %s <sid>move(%s, %s)', mapcmd, a:m.fwd, string(a:m.fwd), string(a:orig_rhs_fwd))
 endfu
 
-fu s:maparg(key, mode, abbr, dict) abort "{{{2
-    let maparg = maparg(a:key, a:mode, a:abbr, a:dict)
-    " TODO: Explain the 2nd condition.{{{
+fu s:maparg(name, mode, abbr, dict, from) abort "{{{2
+    let maparg = maparg(a:name, a:mode, a:abbr, a:dict)
+    " Why this guard?{{{
     "
-    " Update: For now, I've disabled the 2nd condition because it caused an issue.
+    " If `maparg()` is empty, we're working on a built-in motion.
+    " It doesn't make sense to allow the  next `extend()` to include a `rhs` key
+    " in the output dictionary.
     "
-    "     press g;
-    "     press ;;;    Vim moves backward in the change list, instead of forward
+    " If you allow it, `s:populate()` will raise `E716`.
     "
-    " I  think the  issue comes  from the  fact that  we have  installed a  `g;`
-    " mapping in *normal* mode.  But we try to make it repeatable in `nvo` mode.
-    " It looks wrong...  Did we make a mistake when making `g;` repeatable?
-    " Did we make the same mistake elsewhere?
-    " Should our  plugin better  handle this kind  of mistake  (warning message,
-    " bail out, ...) to avoid any surprise?
+    "     E716: Key not present in Dictionary: lhs ...~
     "
-    " ---
-    "
-    " And explain the first condition.
-    " Without, when you press `g;`, you get:
-    "
-    "     Error detected while processing function <SNR>145_move[1]..<SNR>145_get_motion_info:~
-    "     line   36:~
-    "     E716: Key not present in Dictionary: lhs, m.fwd.lhs], a:lhs) >= 0 && index([mode, ' '], m.bwd.mode) >= 0~
-    "
-    " The error comes from `s:get_motion_info()` when it tries to evaluate `m.bwd.lhs`.
-    " Apparently, `m.bwd` has no `lhs` key.
+    " This is because  `s:populate()` will wrongly think that it's  working on a
+    " custom motion instead of a built-in one.
     "}}}
-    "     if empty(maparg) || a:mode == '' && maparg.mode != ' ' | return {} | endif
     if empty(maparg) | return {} | endif
+
+    " There could be a mismatch between the mode you asked, and the one `maparg()` gives you.{{{
+    "
+    " This issue should arise only when you're working with a "pseudo-mode".
+    " That is a collection of real modes.
+    "
+    " For example, you could try to make a motion repeatable in normal mode, but
+    " if the motion was defined  with `:[nore]map`, then `maparg(...).mode` will
+    " be a space and not `n`.
+    " Similarly, you could try to make a motion repeatable in `nvo` mode, but if
+    " the motion  was only  defined with `:n[nore]map`,  then `maparg(...).mode`
+    " will be `n` and not a space.
+    "
+    " It would probably  be difficult to handle such cases,  so we don't bother;
+    " we just bail out, and give a warning message to the user, so that they can
+    " fix their function call; all they have to do, is to use the correct mode:
+    "
+    "    - if the motion is defined in `nvo` mode, then they should pass an empty string
+    "    - if the motion is defined in `n` mode, then they should pass the `'n'` string
+    "    ...
+    "
+    " Note that you may have a motion defined in a pseudo-mode for which there's
+    " no mapping command:
+    "
+    "     noremap <c-q> <esc>
+    "     nunmap <c-q>
+    "     map <c-q>
+    "     ov <C-Q>       * <Esc>~
+    "     ^^
+    "
+    " Such a motion can't be made repeatable.
+    " Again, we don't bother handling this corner case.
+    " You  should not  have such  a motion  in your  config; if  you do,  try to
+    " install it properly via several mapping commands.
+    " You can also try to run this:
+    "
+    "     " `#restore()` should reinstall the motion via several mapping commands
+    "     call lg#map#restore(lg#map#save('<c-q>'))
+    "     map <c-q>
+    "     o  <C-Q>       * <Esc>~
+    "     v  <C-Q>       * <Esc>~
+    "}}}
+    if a:mode != maparg.mode && !(a:mode == '' && maparg.mode == ' ')
+    "                            ├──────────────────────────────────┘
+    "                            └ this mismatch does not cause any issue; ignore it
+        echohl ErrorMsg
+        " `unsilent` in case the repmap function was invoked with `sil!` (to suppress any error when it doesn't exist)
+        unsilent echom printf("%s can't be made repeatable in '%s' mode; it's defined in '%s' mode",
+            \ a:name, {'': 'nvo', 'v': 'v'}[a:mode], maparg.mode)
+        unsilent echom '    '..a:from
+        echohl NONE
+        return 1
+    endif
+
     " Why do you overwrite the `rhs` key?  And why do you do re-invoke `maparg()` a second time?{{{
     "
     " To make sure `<SID>` is translated.
@@ -723,7 +770,7 @@ fu s:maparg(key, mode, abbr, dict) abort "{{{2
     " `s:move()` will translate it into a literal bar via `s:translate()`.
     " And `s:move_again()` will also translate it via an ad-hoc temporary mapping.
     "}}}
-    call extend(maparg, {'rhs': substitute(maparg(a:key, a:mode), '|', '<bar>', 'g')})
+    call extend(maparg, {'rhs': substitute(maparg(a:name, a:mode), '|', '<bar>', 'g')})
     return maparg
 endfu
 
