@@ -413,9 +413,6 @@ fu s:move_again(dir) abort "{{{2
         \ ..motion[a:dir].rhs
 
     call feedkeys("\<plug>(repeat-motion-tmp)", 'i')
-    "                                            │
-    "                                            └ `<plug>(...)`, contrary to `seq`, must ALWAYS
-    "                                              be expanded so don't add the 'n' flag
 
     " Why do we reset all these variables?{{{
     "
