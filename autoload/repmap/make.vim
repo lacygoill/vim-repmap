@@ -137,7 +137,7 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
     let fwd_maparg = s:maparg(fwd_lhs, a:mode, 0, 1, a:from)
     " Don't bail out if `s:maparg()` is empty.
     " We could be working on some default motion (`maparg()` has no info for that).
-    if type(bwd_maparg) != type({}) || type(fwd_maparg) != type({})
+    if type(bwd_maparg) != v:t_dict || type(fwd_maparg) != v:t_dict
         return
     endif
 
@@ -268,7 +268,7 @@ fu s:move(lhs, _) abort "{{{2
     let motion = s:get_motion_info(a:lhs)
 
     " if for some reason, no motion in the db matches `a:lhs`
-    if type(motion) != type({})
+    if type(motion) != v:t_dict
         return ''
     endif
 
@@ -331,7 +331,7 @@ fu s:move_again(dir) abort "{{{2
     " The last motion is  local to a buffer, you change the  buffer, and in this
     " one the motion doesn't exist...
     "}}}
-    if type(motion) != type({})
+    if type(motion) != v:t_dict
         return ''
     endif
 
