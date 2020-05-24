@@ -376,7 +376,7 @@ fu s:move_again(dir) abort "{{{2
     " The original  motion could be  silent or recursive; blindly  returning the
     " keys could alter these properties.
     "
-    " As an  example, the  `; ,  z; z,`  mappings are  non-recursive (`:noremap`),
+    " As an  example, the `;`  and `,` mappings are  non-recursive (`:noremap`),
     " because that's what we want by default.  However, for some motions, we may
     " need recursiveness.
     "
