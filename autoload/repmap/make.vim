@@ -4,6 +4,56 @@ endif
 let g:autoloaded_repmap#make = 1
 
 " Init {{{1
+
+" make sure `lg#map#...()` functions are available
+try
+    call lg#map#save('<c-a><c-b>', 'n')
+catch /^Vim\%((\a\+)\)\=:E117:/
+    echohl ErrorMsg
+    " Do not use `:throw` or `:echoerr`!{{{
+    "
+    " It could  cause a weird issue,  where an exception from  `vim-cookbook` is
+    " unexpectedly not caught:
+    "
+    "     " temporarily disable vim-lg-lib in your vimrc
+    "     " (and maybe vim-fold too to reduce the noise in the next errors)
+    "     $ vim
+    "     " ignore any error due to a missing "lg#()" function during startup
+    "     :Cookbook MathIsPrime
+    "     Error detected while processing function cookbook#main[20]...cookbook#notify:~
+    "     line    2:~
+    "     E117: Unknown function: lg#popup#notification~
+    "
+    " MWE:
+    "
+    "     vim -Nu NONE -S <(cat <<'EOF'
+    "         fu Throw()
+    "             try
+    "                 throw 'some error'
+    "             endtry
+    "         endfu
+    "         sil! call Throw()
+    "         try
+    "             call Unknown()
+    "         catch
+    "         endtry
+    "     EOF
+    "     )
+    "     ...~
+    "     E117: Unknown function: Unknown~
+    "     " result:   'E117' is raised
+    "     " expected: 'E117' is caught
+    "}}}
+    " Why `:unsilent`?{{{
+    "
+    " `#repeatable()` may be invoked from a filetype plugin.
+    " And in that case, messages are silent.
+    "}}}
+    unsilent echom 'E8000: [repmap] the vim-lg-lib dependency is missing'
+    echohl NONE
+    finish
+endtry
+
 " Why not saving the last count to repeat it?{{{
 "
 " I rarely (never?) feel the need to repeat a count.
@@ -66,13 +116,6 @@ let s:NON_RECURSIVE_MAPCMD = {
     \ 'o': 'onoremap',
     \ '' : 'noremap',
     \ }
-
-" make sure `lg#map#...()` functions are available
-try
-    call lg#map#save('<c-a><c-b>', 'n')
-catch /^Vim\%((\a\+)\)\=:E117:/
-    throw 'E8000: [repmap] the vim-lg-lib dependency is missing'
-endtry
 
 " Interface {{{1
 fu repmap#make#repeatable(what) abort "{{{2
@@ -294,10 +337,10 @@ fu s:move(lhs, _) abort "{{{2
     " Because, the rhs is *not* a key sequence. It's an *expression*.
     " It just needs to be evaluated.
     "
-    " Ok, but don't we need to translate special Vim keycodes in the evaluation?
+    " Ok, but don't we need to translate special Vim key codes in the evaluation?
     " Nope.
     " The evaluation  of the  rhs of  an `<expr>`  mapping must  *never* contain
-    " special keycodes.   The expression  must take  care of  returning feedable
+    " special key  codes.  The expression  must take care of  returning feedable
     " keys itself.
     "}}}
     " Why do you need to translate them otherwise?{{{
@@ -785,7 +828,7 @@ fu s:translate(seq) abort "{{{2
     "
     " Also:
     " The keysequence  returned by `s:move()`  is directly fed to  the typeahead
-    " buffer.  If it contains special keycodes, they must be translated.
+    " buffer.  If it contains special key codes, they must be translated.
     "}}}
     return eval('"'..substitute(escape(a:seq, '"\'), '\m\c\ze\%('..s:KEYCODES..'\)', '\\', 'g')..'"')
     "                                          ││
