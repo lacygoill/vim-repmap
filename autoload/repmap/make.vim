@@ -451,20 +451,20 @@ fu s:move_again(dir) abort "{{{2
         \ ..(motion[a:dir].nowait ? ' <nowait>' : '')
         \ ..(motion[a:dir].expr   ? ' <expr>'   : '')
         \ ..(motion[a:dir].silent ? ' <silent>' : '')
-        \ ..(!has('nvim') && motion[a:dir].script  ? ' <script> ' : '')
+        \ ..(motion[a:dir].script  ? ' <script> ' : '')
         \ ..' <plug>(repeat-motion-tmp) '
         \ ..motion[a:dir].rhs
 
     call feedkeys("\<plug>(repeat-motion-tmp)", 'i')
 
-    " Why do we reset all these variables?{{{
+    " Why do we reset this variable?{{{
     "
     " It's for  a custom function which  we could define to  implement a special
     " motion like `fFtTssSS`. Similar to what we have to do in `s:fts()`.
     "
     " `tTfFssSS` are  special because  the lhs, which  is saved  for repetition,
     " doesn't  contain the  necessary  character  which must  be  passed to  the
-    " command. IOW, when the last motion was `fx`, `f` is insufficient to know
+    " command.  IOW, when the last motion  was `fx`, `f` is insufficient to know
     " where to move.
     "}}}
     call timer_start(0, {-> execute('let s:is_repeating_motion = 0')})
