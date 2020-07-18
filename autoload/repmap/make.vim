@@ -26,7 +26,7 @@ catch /^Vim\%((\a\+)\)\=:E117:/
     "
     " MWE:
     "
-    "     vim -Nu NONE -S <(cat <<'EOF'
+    "     $ vim -Nu NONE -S <(cat <<'EOF'
     "         fu Throw()
     "             try
     "                 throw 'some error'
