@@ -5,10 +5,12 @@ let g:autoloaded_repmap#make = 1
 
 " Init {{{1
 
-" make sure `lg#map#...()` functions are available
+" make sure `MapSave()` and `MapRestore()` are available
 try
-    call lg#map#save('<c-a><c-b>', 'n')
-catch /^Vim\%((\a\+)\)\=:E117:/
+    import {MapSave, MapRestore} from 'lg/map.vim'
+"     E1048: Item not found in script: Foobar
+"     E1053: Could not import "foo/bar.vim"
+catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     echohl ErrorMsg
     " Do not use `:throw` or `:echoerr`!{{{
     "
@@ -122,11 +124,11 @@ fu repmap#make#repeatable(what) abort "{{{2
     " can make several motions repeatable
 
     " sanitize input
-    if sort(keys(a:what)) !=# ['buffer', 'from', 'mode', 'motions']
+    if keys(a:what)->sort() !=# ['buffer', 'from', 'mode', 'motions']
         throw 'E8001: [repmap] missing key'
     endif
 
-    for mode in (a:what.mode is# '' ? [''] : split(a:what.mode, '\zs'))
+    for mode in (a:what.mode == '' ? [''] : split(a:what.mode, '\zs'))
         " Make the motions repeatable{{{
         "
         " We need to  install a wrapper mapping around each  motion, to save the
@@ -146,12 +148,12 @@ fu repmap#make#repeatable(what) abort "{{{2
             " a  buffer-local  mapping  using  the same  lhs.   We  handle  this
             " particular case by temporarily removing the latter.
             "}}}
-            if !islocal && (execute(mode..'map <buffer> '..m.bwd) !~# '^\n\nNo mapping found$'
-                       \ || execute(mode..'map <buffer> '..m.fwd) !~# '^\n\nNo mapping found$')
-                let map_save = lg#map#save([m.bwd, m.fwd], mode, v:true)
+            if !islocal && (execute(mode .. 'map <buffer> ' .. m.bwd) !~# '^\n\nNo mapping found$'
+                       \ || execute(mode .. 'map <buffer> ' .. m.fwd) !~# '^\n\nNo mapping found$')
+                let map_save = s:MapSave([m.bwd, m.fwd], mode, v:true)
                 call s:unshadow(m, mode)
                 call s:make_repeatable(m, mode, islocal, from)
-                call lg#map#restore(map_save)
+                call s:MapRestore(map_save)
             else
                 call s:make_repeatable(m, mode, islocal, from)
             endif
@@ -159,9 +161,9 @@ fu repmap#make#repeatable(what) abort "{{{2
 
         " if not already done, install the `,` and `;` mappings to repeat the motions
         if maparg(',') !~# 'move_again('
-            let mapcmd = mode..'noremap'
-            exe mapcmd.." <expr> , <sid>move_again('bwd')"
-            exe mapcmd.." <expr> ; <sid>move_again('fwd')"
+            let mapcmd = mode .. 'noremap'
+            exe mapcmd .. " <expr> , <sid>move_again('bwd')"
+            exe mapcmd .. " <expr> ; <sid>move_again('fwd')"
         endif
     endfor
 endfu
@@ -187,7 +189,7 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
     " if we ask for a local motion to be made repeatable,
     " the 2 lhs should be used in local mappings
     if a:islocal && (!get(bwd_maparg, 'buffer', 0) || !get(fwd_maparg, 'buffer', 0))
-        throw 'E8002: [repmap] invalid motion: '..a:from
+        throw 'E8002: [repmap] invalid motion: ' .. a:from
     endif
 
     " Could we install the wrapper mappings BEFORE populating `s:repeatable_motions`?{{{
@@ -211,8 +213,8 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
     "     endfu
     "}}}
 
-    let origin = matchstr(execute('verb '..a:mode..'map '..(a:islocal ? ' <buffer> ' : '')..bwd_lhs),
-        \ '.*\n\s*\zsLast set from.*')
+    let origin = execute('verb ' .. a:mode .. 'map ' .. (a:islocal ? ' <buffer> ' : '') .. bwd_lhs)
+        \ ->matchstr('.*\n\s*\zsLast set from.*')
     let motion = {
         \ 'made repeatable from': a:from,
         \ 'original mapping': origin,
@@ -228,20 +230,20 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
     call s:populate(motion, a:mode, bwd_lhs, 0, bwd_maparg)
     " now `motion` contains sth like:{{{
     "
-    " { 'bwd'    : {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ...}}
-    "                                                               │
-    "                                                               └ nvo
+    " {'bwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ...}}
+    "                                                          │
+    "                                                          └ nvo
     "}}}
     call s:populate(motion, a:mode, fwd_lhs, 1, fwd_maparg)
     " now `motion` contains sth like:{{{
     "
-    " { 'bwd'    : {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... },
-    "   'fwd'    : {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... }}
+    " {'bwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... },
+    "  'fwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... }}
     "}}}
 
     " Why?{{{
     "
-    " `b:repeatable_motions` may not exist. We must make sure it does.
+    " `b:repeatable_motions` may not exist.  We must make sure it does.
     "
     " I don't want to automatically create it  in an autocmd.  I only want it if
     " necessary.
@@ -322,10 +324,10 @@ fu s:move(lhs, _) abort "{{{2
     " No need to.
     " This function is used in the rhs of wrapper mappings:
     "
-    "     exe mapcmd..'  '..a:m.bwd..'  <sid>move('..string(a:m.bwd)..')'
-    "     exe mapcmd..'  '..a:m.fwd..'  <sid>move('..string(a:m.fwd)..')'
-    "                                                ├─────────────┘
-    "                                                └ automatically translated
+    "     exe mapcmd .. '  ' .. a:m.bwd .. '  <sid>move(' .. string(a:m.bwd) .. ')'
+    "     exe mapcmd .. '  ' .. a:m.fwd .. '  <sid>move(' .. string(a:m.fwd) .. ')'
+    "                                                        ├─────────────┘
+    "                                                        └ automatically translated
     "
     " And mapping commands automatically translate special keys.
     "}}}
@@ -334,7 +336,7 @@ fu s:move(lhs, _) abort "{{{2
     " Why don't you translate the special keys when the mapping uses `<expr>`?{{{
     "
     " Not necessary.
-    " Because, the rhs is *not* a key sequence. It's an *expression*.
+    " Because, the rhs is *not* a key sequence.  It's an *expression*.
     " It just needs to be evaluated.
     "
     " Ok, but don't we need to translate special Vim key codes in the evaluation?
@@ -351,8 +353,8 @@ fu s:move(lhs, _) abort "{{{2
     " `s:translate()`.
     "}}}
     return motion[dir].expr
-       \ ?     eval(motion[dir].rhs)
-       \ :     s:translate(motion[dir].rhs)
+        \ ?     eval(motion[dir].rhs)
+        \ :     s:translate(motion[dir].rhs)
 endfu
 
 fu s:move_again(dir) abort "{{{2
@@ -395,10 +397,10 @@ fu s:move_again(dir) abort "{{{2
     " Suppose we've pressed `fx`, and now we want to repeat it with `;`.
     " In this case:
     "
-    "     motion[a:dir].expr  =  1
-    "     motion[a:dir].rhs   =  <sid>fts()
-    "                                 │
-    "                                 └ custom function defined in another script
+    "     motion[a:dir].expr = 1
+    "     motion[a:dir].rhs = <sid>fts()
+    "                              │
+    "                              └ custom function defined in another script
     "
     " The code in `s:fts()` is going to be evaluated, and the result typed as keys.
     " But, `s:fts()` needs to know whether we are pressing `f` to ask for a target,
@@ -447,20 +449,20 @@ fu s:move_again(dir) abort "{{{2
     "      Currently,  it  happens when  we  cycle  through the  levels  of
     "      lightness of the colorscheme (`]oL  co;  ;`).
     "}}}
-    exe s:get_current_mode()..(!motion[a:dir].noremap ? 'map' : 'noremap')
-        \ ..(motion[a:dir].nowait ? ' <nowait>' : '')
-        \ ..(motion[a:dir].expr   ? ' <expr>'   : '')
-        \ ..(motion[a:dir].silent ? ' <silent>' : '')
-        \ ..(motion[a:dir].script  ? ' <script> ' : '')
-        \ ..' <plug>(repeat-motion-tmp) '
-        \ ..motion[a:dir].rhs
+    exe s:get_current_mode() .. (!motion[a:dir].noremap ? 'map' : 'noremap')
+        \ .. (motion[a:dir].nowait ? ' <nowait>' : '')
+        \ .. (motion[a:dir].expr ? ' <expr>' : '')
+        \ .. (motion[a:dir].silent ? ' <silent>' : '')
+        \ .. (motion[a:dir].script ? ' <script> ' : '')
+        \ .. ' <plug>(repeat-motion-tmp) '
+        \ .. motion[a:dir].rhs
 
     call feedkeys("\<plug>(repeat-motion-tmp)", 'i')
 
     " Why do we reset this variable?{{{
     "
     " It's for  a custom function which  we could define to  implement a special
-    " motion like `fFtTssSS`. Similar to what we have to do in `s:fts()`.
+    " motion like `fFtTssSS`.  Similar to what we have to do in `s:fts()`.
     "
     " `tTfFssSS` are  special because  the lhs, which  is saved  for repetition,
     " doesn't  contain the  necessary  character  which must  be  passed to  the
@@ -490,9 +492,9 @@ fu s:populate(motion, mode, lhs, is_fwd, maparg) abort "{{{2
 
     " make a built-in motion repeatable
     else
-        let a:motion[dir] = extend(deepcopy(s:DEFAULT_MAPARG),
-            \ {'mode': empty(a:mode) ? ' ' : a:mode })
-        "           Why? ┘{{{
+        let a:motion[dir] = deepcopy(s:DEFAULT_MAPARG)
+            \ ->extend({'mode': empty(a:mode) ? ' ' : a:mode})
+        "                    Why? ┘{{{
         "
         " Because if `maparg()`  doesn't give any info, we want  to fall back on
         " the mode `nvo`.  And to be  consistent, we want to populate our motion
@@ -565,13 +567,13 @@ fu s:collides_with_db(motion, repeatable_motions) abort "{{{2
     "    - we make this motion repeatable: `[m` + `]m`
     "    - and we try to make this other motion repeatable: `[m` + `]]`
     "
-    " We've probably made an error. We should be warned so that we can fix it.
+    " We've probably made an error.  We should be warned so that we can fix it.
     "}}}
 
     "   ┌ Motion
     "   │
     for m in a:repeatable_motions
-        if   [m.bwd.lhs, m.bwd.mode] ==# [a:motion.bwd.lhs, a:motion.bwd.mode]
+        if [m.bwd.lhs, m.bwd.mode] ==# [a:motion.bwd.lhs, a:motion.bwd.mode]
         \ || [m.fwd.lhs, m.fwd.mode] ==# [a:motion.fwd.lhs, a:motion.fwd.mode]
             try
                 throw printf('E8003: [repmap] cannot process motion  %s : %s',
@@ -587,7 +589,7 @@ endfu
 fu s:get_current_mode() abort "{{{2
     " Why the substitutions?{{{
     "
-    "     substitute(mode(1), "[vV\<c-v>]", 'x', ''):
+    "     mode(1)->substitute("[vV\<c-v>]", 'x', ''):
     "
     "         normalize output of `mode()` to match the one of `maparg()`
     "         in case we're in visual mode
@@ -596,7 +598,7 @@ fu s:get_current_mode() abort "{{{2
     "
     "         same thing for operator-pending mode
     "}}}
-    return substitute(substitute(mode(1), "[vV\<c-v>]", 'x', ''), "no[vV\<c-v>]\\=", 'o', '')
+    return mode(1)->substitute("[vV\<c-v>]", 'x', '')->substitute("no[vV\<c-v>]\\=", 'o', '')
 endfu
 
 fu s:get_direction(lhs, motion) abort "{{{2
@@ -619,8 +621,9 @@ fu s:get_mapcmd(mode, maparg) abort "{{{2
 
     let mapcmd = s:{isrecursive ? '' : 'NON_'}RECURSIVE_MAPCMD[a:mode]
     let mapcmd ..= ' <expr>'
-    let mapcmd ..= join(map(['buffer', 'nowait', 'silent', 'script'],
-        \ {_,v -> get(a:maparg, v, 0) ? '<'..v..'>' : ''}))
+    let mapcmd ..= map(['buffer', 'nowait', 'silent', 'script'],
+        \ {_, v -> get(a:maparg, v, 0) ? '<' .. v .. '>' : ''})
+        \ ->join()
 
     return mapcmd
 endfu
@@ -634,7 +637,7 @@ fu s:get_motion_info(lhs) abort "{{{2
     "}}}
 
     let mode = s:get_current_mode()
-    let motions = get(maparg(a:lhs, mode, 0, 1), 'buffer', 0)
+    let motions = maparg(a:lhs, mode, 0, 1)->get('buffer', 0)
         \ ? get(b:, 'repeatable_motions', [])
         \ : s:repeatable_motions
 
@@ -661,7 +664,7 @@ fu s:get_motion_info(lhs) abort "{{{2
         " No need to.
         " We've done it already in `s:populate()`.
         "}}}
-        if   index([m.bwd.lhs, m.fwd.lhs], a:lhs) >= 0
+        if index([m.bwd.lhs, m.fwd.lhs], a:lhs) >= 0
         \ && index([mode, ' '], m.bwd.mode) >= 0
         "                       ├────────┘
         "                       └ mode of the motion:
@@ -776,7 +779,7 @@ fu s:maparg(name, mode, abbr, dict, from) abort "{{{2
     " You can also try to run this:
     "
     "     " `#restore()` should reinstall the motion via several mapping commands
-    "     call lg#map#restore(lg#map#save('<c-q>'))
+    "     call s:MapSave('<c-q>')->s:MapRestore()
     "     map <c-q>
     "     o  <C-Q>       * <Esc>~
     "     v  <C-Q>       * <Esc>~
@@ -788,7 +791,7 @@ fu s:maparg(name, mode, abbr, dict, from) abort "{{{2
         " `unsilent` in case the repmap function was invoked with `sil!` (to suppress any error when it doesn't exist)
         unsilent echom printf("%s can't be made repeatable in '%s' mode; it's defined in '%s' mode",
             \ a:name, {'': 'nvo', 'v': 'v'}[a:mode], maparg.mode)
-        unsilent echom '    '..a:from
+        unsilent echom '    ' .. a:from
         echohl NONE
         return 1
     endif
@@ -810,7 +813,7 @@ fu s:maparg(name, mode, abbr, dict, from) abort "{{{2
     " `s:move()` will translate it into a literal bar via `s:translate()`.
     " And `s:move_again()` will also translate it via an ad-hoc temporary mapping.
     "}}}
-    call extend(maparg, {'rhs': substitute(maparg(a:name, a:mode), '|', '<bar>', 'g')})
+    call extend(maparg, {'rhs': maparg(a:name, a:mode)->substitute('|', '<bar>', 'g')})
     return maparg
 endfu
 
@@ -830,23 +833,25 @@ fu s:translate(seq) abort "{{{2
     " The keysequence  returned by `s:move()`  is directly fed to  the typeahead
     " buffer.  If it contains special key codes, they must be translated.
     "}}}
-    return eval('"'..substitute(escape(a:seq, '"\'), '\m\c\ze\%('..s:KEYCODES..'\)', '\\', 'g')..'"')
-    "                                          ││
-    "                                          │└ to prevent a real backslash contained in the sequence
-    "                                          │  from being removed by `eval("...")`
-    "                                          │
-    "                                          └ to not break the string passed to `eval()` prematurely
+    "                             ┌ to not break the string passed to `eval()` prematurely
+    "                             │
+    "                             │┌ to prevent a real backslash contained in the sequence
+    "                             ││ from being removed by `eval("...")`
+    "                             ││
+    return ('"' .. escape(a:seq, '"\')
+        \ ->substitute('\m\c\ze\%(' .. s:KEYCODES .. '\)', '\\', 'g') .. '"')
+        \ ->eval()
 endfu
 
 fu s:unshadow(m, mode) abort "{{{2
-    exe 'sil! '..a:mode..'unmap <buffer> '..a:m.bwd
-    exe 'sil! '..a:mode..'unmap <buffer> '..a:m.fwd
+    exe 'sil! ' .. a:mode .. 'unmap <buffer> ' .. a:m.bwd
+    exe 'sil! ' .. a:mode .. 'unmap <buffer> ' .. a:m.fwd
 endfu
 
 fu s:update_undo_ftplugin() abort "{{{2
-    if stridx(get(b:, 'undo_ftplugin', ''), 'unlet! b:repeatable_motions') == -1
+    if get(b:, 'undo_ftplugin', '')->stridx('unlet! b:repeatable_motions') == -1
         let b:undo_ftplugin = get(b:, 'undo_ftplugin', 'exe')
-            \ ..'| unlet! b:repeatable_motions'
+            \ .. '| unlet! b:repeatable_motions'
     endif
 endfu
 

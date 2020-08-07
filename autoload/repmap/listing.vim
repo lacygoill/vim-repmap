@@ -10,7 +10,7 @@ const s:MODE2LETTER = {'normal': 'n', 'visual': 'x', 'operator-pending': 'no', '
 
 " Interface {{{1
 fu repmap#listing#complete(arglead, cmdline, pos) abort "{{{2
-    let word_before_cursor = matchstr(a:cmdline, '.*\s\zs-\S.*\%'.a:pos.'c.')
+    let word_before_cursor = matchstr(a:cmdline, '.*\s\zs-\S.*\%' .. a:pos .. 'c.')
     if word_before_cursor =~# '-mode\s\+\w*$'
         let modes =<< trim END
             normal
@@ -40,8 +40,8 @@ fu repmap#listing#main(...) abort "{{{2
     " get the asked options
     let cmd_args = split(a:1)
     let opt = {
-        \ 'mode':     matchstr(a:1, '-mode\s\+\zs[-a-z]\+'),
-        \ 'scope':    matchstr(a:1, '-scope\s\+\zs\w\+'),
+        \ 'mode': matchstr(a:1, '-mode\s\+\zs[-a-z]\+'),
+        \ 'scope': matchstr(a:1, '-scope\s\+\zs\w\+'),
         \ 'verbose1': index(cmd_args, '-v') >= 0,
         \ 'verbose2': index(cmd_args, '-vv') >= 0,
         \ }
@@ -52,7 +52,7 @@ fu repmap#listing#main(...) abort "{{{2
     call s:populate_listing(opt)
 
     " display it
-    let excmd = 'RepeatableMotions '..a:1
+    let excmd = 'RepeatableMotions ' .. a:1
     call debug#log#output({'excmd': excmd, 'lines': s:get_lines()})
     call s:customize_preview_window()
 endfu
@@ -79,10 +79,10 @@ endfu
 
 fu s:add_text_to_write(opt, m, scope) abort "{{{2
     let text = printf('  %s  %s | %s',
-    \                 a:m.bwd.mode, a:m.bwd.untranslated_lhs, a:m.fwd.untranslated_lhs)
+        \ a:m.bwd.mode, a:m.bwd.untranslated_lhs, a:m.fwd.untranslated_lhs)
     let text ..= a:opt.verbose1
-            \ ?     '    '.a:m['original mapping']
-            \ :     ''
+        \ ?     '    ' .. a:m['original mapping']
+        \ :     ''
 
     let lines = [text]
     if a:opt.verbose2
@@ -91,19 +91,20 @@ fu s:add_text_to_write(opt, m, scope) abort "{{{2
         " Why didn't you wrote earlier:
         "
         "     let line ..= "\n"
-        "     \           .'       '.a:m['original mapping']."\n"
-        "     \           .'       Made repeatable from '.a:m['made repeatable from']
-        "     \           ."\n"
+        "     \         .. '       ' .. a:m['original mapping'] .. "\n"
+        "     \         .. '       Made repeatable from ' .. a:m['made repeatable from']
+        "     \         .. "\n"
         "
-        " Because eventually, we're going to write the text via `debug#log#output()`
-        " which itself invokes `writefile()`. And the latter writes "\n" as a NUL.
+        " Because   eventually,   we're   going    to   write   the   text   via
+        " `debug#log#output()`  which  itself  invokes `writefile()`.   And  the
+        " latter writes "\n" as a NUL.
         " The only way to make `writefile()` write a newline is to split the lines
         " into several list items.
         "}}}
         call extend(lines,
-        \                ['       '.a:m['original mapping']]
-        \               +['       Made repeatable from '.a:m['made repeatable from']]
-        \               +[''])
+            \   ['       ' .. a:m['original mapping']]
+            \ + ['       Made repeatable from ' .. a:m['made repeatable from']]
+            \ + [''])
     endif
 
     call extend(s:listing[a:scope], lines)
