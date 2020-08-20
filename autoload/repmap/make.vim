@@ -45,6 +45,8 @@ catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     "     E117: Unknown function: Unknown~
     "     " result:   'E117' is raised
     "     " expected: 'E117' is caught
+    "
+    " Update: This comment might no longer be relevant, but the MWE is still relevant.
     "}}}
     " Why `:unsilent`?{{{
     "

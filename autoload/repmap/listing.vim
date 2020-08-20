@@ -10,8 +10,8 @@ const s:MODE2LETTER = {'normal': 'n', 'visual': 'x', 'operator-pending': 'no', '
 
 " Interface {{{1
 fu repmap#listing#complete(arglead, cmdline, pos) abort "{{{2
-    let word_before_cursor = matchstr(a:cmdline, '.*\s\zs-\S.*\%' .. a:pos .. 'c.')
-    if word_before_cursor =~# '-mode\s\+\w*$'
+    let from_dash_to_cursor = matchstr(a:cmdline, '.*\s\zs-.*\%' .. (a:pos + 1) .. 'c')
+    if from_dash_to_cursor =~# '-mode\s\+\w*$'
         let modes =<< trim END
             normal
             visual
@@ -20,7 +20,7 @@ fu repmap#listing#complete(arglead, cmdline, pos) abort "{{{2
         END
         return join(modes, "\n")
 
-    elseif word_before_cursor =~# '-scope\s\+\w*$'
+    elseif from_dash_to_cursor =~# '-scope\s\+\w*$'
         return "local\nglobal"
 
     elseif empty(a:arglead) || a:arglead[0] is# '-'
