@@ -556,7 +556,7 @@ fu s:collides_with_db(motion, repeatable_motions) abort "{{{2
     "
     " If you try to install a wrapper around a key which has already been wrapped,
     " you'll probably end up losing the original definition:
-    " in the db, it may be replaced with the one of the first wrapper.
+    " in the db, it may be replaced by the one of the first wrapper.
     "
     " Besides:
     " Vim shouldn't make a motion repeatable twice (total collision).
