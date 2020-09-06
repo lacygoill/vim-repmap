@@ -130,8 +130,8 @@ endfu
 " Misc. {{{1
 fu s:customize_preview_window() abort "{{{2
     if &l:pvw
-        call matchadd('Title', '^Motions repeated with:')
-        call matchadd('SpecialKey', '^\%(global\|local\)$')
+        call matchadd('Title', '^Motions repeated with:', 0)
+        call matchadd('SpecialKey', '^\%(global\|local\)$', 0)
 
         nno <buffer><nowait><silent> ]] :<c-u>call search('^\%(Motions\<bar>local\<bar>global\)')<cr>
         nno <buffer><nowait><silent> [[ :<c-u>call search('^\%(Motions\<bar>local\<bar>global\)', 'b')<cr>
