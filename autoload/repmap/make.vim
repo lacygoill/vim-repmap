@@ -75,6 +75,7 @@ let s:KEYCODES =<< trim END
     <Bslash>
     <C-
     <CR>
+    <Cmd>
     <Del>
     <Down>
     <End>
@@ -164,8 +165,8 @@ fu repmap#make#repeatable(what) abort "{{{2
         " if not already done, install the `,` and `;` mappings to repeat the motions
         if maparg(',') !~# 'move_again('
             let mapcmd = mode .. 'noremap'
-            exe mapcmd .. " <expr> , <sid>move_again('bwd')"
-            exe mapcmd .. " <expr> ; <sid>move_again('fwd')"
+            exe mapcmd .. " , <cmd>call <sid>move_again('bwd')<cr>"
+            exe mapcmd .. " ; <cmd>call <sid>move_again('fwd')<cr>"
         endif
     endfor
 endfu
@@ -194,7 +195,7 @@ fu s:make_repeatable(m, mode, islocal, from) abort "{{{2
         throw 'E8002: [repmap] invalid motion: ' .. a:from
     endif
 
-    " Could we install the wrapper mappings BEFORE populating `s:repeatable_motions`?{{{
+    " Could we install the wrapper mappings *before* populating `s:repeatable_motions`?{{{
     "
     " No.
     " It would  cause `s:populate()`  to capture the  definition of  the wrapper
@@ -365,7 +366,7 @@ fu s:move_again(dir) abort "{{{2
     " make sure the arguments are valid,
     " and that we've used at least one motion in the past
     if index(['bwd', 'fwd'], a:dir) == -1 || empty(s:last_motion)
-        return ''
+        return
     endif
 
     let motion = s:get_motion_info(s:last_motion)
@@ -379,7 +380,7 @@ fu s:move_again(dir) abort "{{{2
     " one the motion doesn't exist...
     "}}}
     if type(motion) != v:t_dict
-        return ''
+        return
     endif
 
     " What does this variable mean?{{{
@@ -472,7 +473,6 @@ fu s:move_again(dir) abort "{{{2
     " where to move.
     "}}}
     call timer_start(0, {-> execute('let s:is_repeating_motion = 0')})
-    return ''
 endfu
 
 fu s:populate(motion, mode, lhs, is_fwd, maparg) abort "{{{2

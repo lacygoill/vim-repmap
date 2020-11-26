@@ -133,8 +133,8 @@ fu s:customize_preview_window() abort "{{{2
         call matchadd('Title', '^Motions repeated with:', 0)
         call matchadd('SpecialKey', '^\%(global\|local\)$', 0)
 
-        nno <buffer><nowait><silent> ]] :<c-u>call search('^\%(Motions\<bar>local\<bar>global\)')<cr>
-        nno <buffer><nowait><silent> [[ :<c-u>call search('^\%(Motions\<bar>local\<bar>global\)', 'b')<cr>
+        nno <buffer><nowait> ]] <cmd>call search('^\%(Motions\<bar>local\<bar>global\)')<cr>
+        nno <buffer><nowait> [[ <cmd>call search('^\%(Motions\<bar>local\<bar>global\)', 'b')<cr>
         sil! 1/^Motions/
     endif
 endfu
