@@ -45,6 +45,10 @@ fu repmap#listing#main(...) abort "{{{2
         \ 'verbose1': index(cmd_args, '-v') >= 0,
         \ 'verbose2': index(cmd_args, '-vv') >= 0,
         \ }
+    " if we add too many `v` flags by accident, we still want the maximum verbosity level
+    if match(a:1, '-vvv\+') >= 0
+        let opt.verbose2 = v:true
+    endif
     let opt.mode = has_key(s:MODE2LETTER, opt.mode) ? s:MODE2LETTER[opt.mode] : ''
 
     " get the text to display

@@ -717,7 +717,7 @@ fu s:install_wrapper(mode, m, maparg, orig_rhs_bwd, orig_rhs_fwd) abort "{{{2
     "     n  >t          * <SNR>145_move('>t')
     "
     "     " ok, this mapping moves a tab page
-    "     n  >t          * <SNR>145_move('>t', ':<C-U>call <SNR>144_move_tabpage(''+1'')<CR>')
+    "     n  >t          * <SNR>145_move('>t', '<Cmd>call <SNR>144_move_tabpage(''+1'')<CR>')
     "
     " And more  useful; without the  original rhs,  it's impossible to  find the
     " `>t` mapping by  looking for the keyword "tab" or  "tabpage" after running
