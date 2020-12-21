@@ -122,6 +122,26 @@ let s:NON_RECURSIVE_MAPCMD = {
     \ '' : 'noremap',
     \ }
 
+" Necessary to avoid `<plug>(repeat-motion-tmp)` to be sometimes written literally into the buffer.{{{
+"
+" That can happen when we press something like `fx` then `c;` (assuming there is
+" an `x` character in the buffer).
+"
+" You might  wonder how that's possible.   After all, when this  `feedkeys()` is
+" invoked:
+"
+"     call feedkeys("\<plug>(repeat-motion-tmp)", 'i')
+"
+" We should be in operator-pending mode, right?
+" Correct.  But,  remember that `feedkeys()`  only writes keys in  the typeahead
+" buffer;  it   doesn't  execute  them.   When   `<plug>(repeat-motion-tmp)`  is
+" processed, we might be in a different mode.
+"
+" You could  fix that by  passing the `x` flag  to `feedkeys()`, but  that would
+" also cause Vim to press `Esc`, which is undesirable.
+"}}}
+ino <plug>(repeat-motion-tmp) <nop>
+
 " Interface {{{1
 fu repmap#make#repeatable(what) abort "{{{2
     " can make several motions repeatable
@@ -448,7 +468,7 @@ fu s:move_again(dir) abort "{{{2
     "      `<silent>` only prevents the rhs from being  echo'ed.
     "      But it can still display a message if it wants to.
     "
-    "    - Sometimes, the command-line may seem to flicker.
+    "    - Sometimes, the command-line seems to flicker.
     "      Currently,  it  happens when  we  cycle  through the  levels  of
     "      lightness of the colorscheme (`]oL  co;  ;`).
     "}}}
