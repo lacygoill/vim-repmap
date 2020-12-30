@@ -192,7 +192,7 @@ fu repmap#make#repeatable(what) abort "{{{2
 endfu
 
 fu repmap#make#is_repeating() abort "{{{2
-    return get(s:, 'is_repeating_motion', 0)
+    return get(s:, 'is_repeating_motion', v:false)
 endfu
 " }}}1
 " Core {{{1
@@ -437,7 +437,7 @@ fu s:move_again(dir) abort "{{{2
     "         ...
     "     endif
     "}}}
-    let s:is_repeating_motion = a:dir is# 'fwd' ? 1 : -1
+    let s:is_repeating_motion = v:true
 
     " Why not returning the sequence of keys directly?{{{
     "
@@ -492,7 +492,7 @@ fu s:move_again(dir) abort "{{{2
     " command.  IOW, when the last motion  was `fx`, `f` is insufficient to know
     " where to move.
     "}}}
-    call timer_start(0, {-> execute('let s:is_repeating_motion = 0')})
+    call timer_start(0, {-> execute('let s:is_repeating_motion = v:false')})
 endfu
 
 fu s:populate(motion, mode, lhs, is_fwd, maparg) abort "{{{2
