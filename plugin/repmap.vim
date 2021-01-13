@@ -1,7 +1,7 @@
-if exists('g:loaded_repmap')
-    finish
-endif
-let g:loaded_repmap = 1
+vim9 noclear
+
+if exists('loaded') | finish | endif
+var loaded = true
 
 com -bar -nargs=? -complete=custom,repmap#listing#complete
-    \ RepeatableMotions call repmap#listing#main(<q-args>)
+    \ RepeatableMotions repmap#listing#main(<q-args>)

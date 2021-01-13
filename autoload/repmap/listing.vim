@@ -5,7 +5,7 @@ let g:autoloaded_repmap#listing = 1
 
 " Init {{{1
 
-const s:REPEATABLE_MOTIONS = repmap#make#share_env()
+const s:REPEATABLE_MOTIONS = repmap#make#shareEnv()
 const s:MODE2LETTER = {'normal': 'n', 'visual': 'x', 'operator-pending': 'no', 'nvo': ' '}
 
 " Interface {{{1
