@@ -31,7 +31,7 @@ catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     #     $ vim -Nu NONE -S <(cat <<'EOF'
     #         fu Throw()
     #             try
-    #                 throw 'some error'
+    #                 throw 'error'
     #             endtry
     #         endfu
     #         sil! call Throw()
@@ -97,7 +97,7 @@ END
 KEYCODES = join(KEYCODES, '\|')
 lockvar! KEYCODES
 
-const DEFAULT_MAPARG = {
+const DEFAULT_MAPARG: dict<any> = {
     buffer: false,
     expr: false,
     # Why a space?{{{
@@ -117,14 +117,14 @@ const DEFAULT_MAPARG = {
     script: false,
 }
 
-const RECURSIVE_MAPCMD = {
+const RECURSIVE_MAPCMD: dict<string> = {
     n: 'nmap',
     x: 'xmap',
     o: 'omap',
     '': 'map',
     }
 
-const NON_RECURSIVE_MAPCMD = {
+const NON_RECURSIVE_MAPCMD: dict<string> = {
     n: 'nnoremap',
     x: 'xnoremap',
     o: 'onoremap',
@@ -171,8 +171,8 @@ def repmap#make#repeatable(what: dict<any>) #{{{2
         # information.  Otherwise, how  the repeating mappings would  be able to
         # emulate the original motion?
         #}}}
-        var islocal = what.buffer
-        var from = what.from
+        var islocal: bool = what.buffer
+        var from: string = what.from
         for m in what.motions
             # Why this check?{{{
             #
@@ -182,7 +182,7 @@ def repmap#make#repeatable(what: dict<any>) #{{{2
             #}}}
             if !islocal && (execute(mode .. 'map <buffer> ' .. m.bwd) !~ '^\n\nNo mapping found$'
                          || execute(mode .. 'map <buffer> ' .. m.fwd) !~ '^\n\nNo mapping found$')
-                var map_save = MapSave([m.bwd, m.fwd], mode, true)
+                var map_save: list<dict<any>> = MapSave([m.bwd, m.fwd], mode, true)
                 Unshadow(m, mode)
                 MakeRepeatable(m, mode, islocal, from)
                 MapRestore(map_save)
@@ -193,7 +193,7 @@ def repmap#make#repeatable(what: dict<any>) #{{{2
 
         # if not already done, install the `,` and `;` mappings to repeat the motions
         if maparg(',') !~ 'MoveAgain('
-            var mapcmd = mode .. 'noremap'
+            var mapcmd: string = mode .. 'noremap'
             exe mapcmd .. " , <cmd>call <sid>MoveAgain('bwd')<cr>"
             exe mapcmd .. " ; <cmd>call <sid>MoveAgain('fwd')<cr>"
         endif
@@ -206,136 +206,144 @@ enddef
 var is_repeating_motion: bool
 # }}}1
 # Core {{{1
-fu MakeRepeatable(m, mode, islocal, from) abort "{{{2
-    " can only make ONE motion repeatable
+def MakeRepeatable( #{{{2
+    m: dict<any>,
+    mode: string,
+    islocal: bool,
+    from: string
+    )
+    # can only make ONE motion repeatable
 
-    let bwd_lhs = a:m.bwd
-    let fwd_lhs = a:m.fwd
-    let bwd_maparg = s:Maparg(bwd_lhs, a:mode, v:false, v:true, a:from)
-    let fwd_maparg = s:Maparg(fwd_lhs, a:mode, v:false, v:true, a:from)
-    " Don't bail out if `s:Maparg()` is empty.
-    " We could be working on some default motion (`maparg()` has no info for that).
+    var bwd_lhs: string = m.bwd
+    var fwd_lhs: string = m.fwd
+    var bwd_maparg: dict<any> = Maparg(bwd_lhs, mode, false, true, from)
+    var fwd_maparg: dict<any> = Maparg(fwd_lhs, mode, false, true, from)
+    # Don't bail out if `Maparg()` is empty.
+    # We could be working on some default motion (`maparg()` has no info for that).
     if type(bwd_maparg) != v:t_dict || type(fwd_maparg) != v:t_dict
         return
     endif
 
-    " if we ask for a local motion to be made repeatable,
-    " the 2 lhs should be used in local mappings
-    if a:islocal && (!get(bwd_maparg, 'buffer', 0) || !get(fwd_maparg, 'buffer', 0))
-        throw 'E8002: [repmap] invalid motion: ' .. a:from
+    # if we ask for a local motion to be made repeatable,
+    # the 2 lhs should be used in local mappings
+    if islocal && (!get(bwd_maparg, 'buffer', 0) || !get(fwd_maparg, 'buffer', 0))
+        throw 'E8002: [repmap] invalid motion: ' .. from
     endif
 
-    " Could we install the wrapper mappings *before* populating `s:repeatable_motions`?{{{
-    "
-    " No.
-    " It would  cause `s:Populate()`  to capture the  definition of  the wrapper
-    " mapping instead of the original motion.
-    " So, when  we would press  a motion, we would  enter an infinite  loop: the
-    " wrapper would call itself again and again, until E132.
-    "
-    " The fact  that the wrapper  mapping is, by default,  non-recursive doesn't
-    " change  anything.   When  we  would  press the  lhs,  Vim  would  evaluate
-    " `s:Move('lhs')`.
-    " At the end, Vim  would compute the keys to press: the  latter would be the
-    " output of  `s:Move('lhs')`.  That's  where the recursion  comes from.  It's
-    " like pressing `cd`, where `cd` is defined like so:
-    "
-    "     nno <expr> cd Func()
-    "     fu Func()
-    "         return Func()
-    "     endfu
-    "}}}
+    # Could we install the wrapper mappings *before* populating `repeatable_motions`?{{{
+    #
+    # No.
+    # It  would cause  `Populate()` to  capture  the definition  of the  wrapper
+    # mapping instead of the original motion.
+    # So, when  we would press  a motion, we would  enter an infinite  loop: the
+    # wrapper would call itself again and again, until E132.
+    #
+    # The fact  that the wrapper  mapping is, by default,  non-recursive doesn't
+    # change  anything.   When  we  would  press the  lhs,  Vim  would  evaluate
+    # `Move('lhs')`.
+    # At the end, Vim  would compute the keys to press: the  latter would be the
+    # output of  `Move('lhs')`.  That's  where the  recursion comes  from.  It's
+    # like pressing `cd`, where `cd` is defined like so:
+    #
+    #     nno <expr> cd Func()
+    #     fu Func()
+    #         return Func()
+    #     endfu
+    #}}}
 
-    let origin = execute('verb ' .. a:mode .. 'map ' .. (a:islocal ? ' <buffer> ' : '') .. bwd_lhs)
-        \ ->matchstr('.*\n\s*\zsLast set from.*')
-    let motion = {
-        \ 'made repeatable from': a:from,
-        \ 'original mapping': origin,
-        \ }
-    " Why don't we write an assignment to populate `motion`?{{{
-    "
-    " `motion` is an array (!= scalar), so Vim passes it to `s:Populate()`
-    " as a REFERENCE (not as a VALUE), and the function operates in-place.
-    " IOW: no need to write:
-    "
-    "     let motion = s:Populate(motion, ...)
-    "}}}
-    call s:Populate(motion, a:mode, bwd_lhs, v:false, bwd_maparg)
-    " now `motion` contains sth like:{{{
-    "
-    " {'bwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ...}}
-    "                                                          │
-    "                                                          └ nvo
-    "}}}
-    call s:Populate(motion, a:mode, fwd_lhs, v:true, fwd_maparg)
-    " now `motion` contains sth like:{{{
-    "
-    " {'bwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... },
-    "  'fwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... }}
-    "}}}
+    var origin: string = execute(
+        'verb ' .. mode .. 'map ' .. (islocal ? ' <buffer> ' : '') .. bwd_lhs
+        )->matchstr('.*\n\s*\zsLast set from.*')
+    var motion: dict<any> = {
+        'made repeatable from': from,
+        'original mapping': origin,
+        }
+    # Why don't we write an assignment to populate `motion`?{{{
+    #
+    # `motion` is an array (!= scalar), so Vim passes it to `Populate()`
+    # as a REFERENCE (not as a VALUE), and the function operates in-place.
+    # IOW: no need to write:
+    #
+    #     var motion = Populate(motion, ...)
+    #}}}
+    Populate(motion, mode, bwd_lhs, false, bwd_maparg)
+    # now `motion` contains sth like:{{{
+    #
+    # {'bwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ...}}
+    #                                                          │
+    #                                                          └ nvo
+    #}}}
+    Populate(motion, mode, fwd_lhs, true, fwd_maparg)
+    # now `motion` contains sth like:{{{
+    #
+    # {'bwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... },
+    #  'fwd': {'expr': 0, 'noremap': 1, 'lhs': '...', 'mode': ' ', ... }}
+    #}}}
 
-    " Why?{{{
-    "
-    " `b:repeatable_motions` may not exist.  We must make sure it does.
-    "
-    " I don't want to automatically create it  in an autocmd.  I only want it if
-    " necessary.
-    "}}}
-    " Ok, but why not `let repeatable_motions = get(b:, 'repeatable_motions', [])` ?{{{
-    "
-    " It  would  give  us  an  empty  list which  would  NOT  be  the  reference
-    " to  `b:repeatable_motions`.    It  would   just  be  an   empty  list.
-    "
-    " We need  to update the *existing*  database of local motions,  not restart
-    " from scratch.
-    "}}}
-    if a:islocal && !exists('b:repeatable_motions')
-        let b:repeatable_motions = []
+    # Why?{{{
+    #
+    # `b:repeatable_motions` may not exist.  We must make sure it does.
+    #
+    # I don't want to automatically create it  in an autocmd.  I only want it if
+    # necessary.
+    #}}}
+    # Ok, but why not `var repeatable_motions = get(b:, 'repeatable_motions', [])` ?{{{
+    #
+    # It  would  give  us  an  empty  list which  would  NOT  be  the  reference
+    # to  `b:repeatable_motions`.    It  would   just  be  an   empty  list.
+    #
+    # We need  to update the *existing*  database of local motions,  not restart
+    # from scratch.
+    #}}}
+    if islocal && !exists('b:repeatable_motions')
+        b:repeatable_motions = []
     endif
 
-    " What does `repeatable_motions` contain?{{{
-    "
-    " A reference to a list of motions:  `[s:|b:]repeatable_motions`
-    "}}}
-    "   Why is it a reference, and not a value?{{{
-    "
-    " Vim *always* assigns a reference of an array to a variable, not its value.
-    " So, `repeatable_motions`  contains a reference to  its script/buffer-local
-    " counterpart.
-    "}}}
-    let repeatable_motions = a:islocal ? b:repeatable_motions : s:repeatable_motions
+    # What does `repeatable_motions` contain?{{{
+    #
+    # A reference to a list of motions:  `[s:|b:]repeatable_motions`
+    #}}}
+    #   Why is it a reference, and not a value?{{{
+    #
+    # Vim *always* assigns a reference of an array to a variable, not its value.
+    # So, `repeatable_motions`  contains a reference to  its script/buffer-local
+    # counterpart.
+    #}}}
+    var repmo: list<dict<any>> = islocal
+        ?     b:repeatable_motions
+        :     repeatable_motions
 
-    if s:CollidesWithDb(motion, repeatable_motions)
+    if CollidesWithDb(motion, repmo)
         return
     endif
 
-    call s:InstallWrapper(a:mode,
-        \ a:m,
-        \ bwd_maparg,
-        \ motion.bwd.rhs,
-        \ motion.fwd.rhs
-        \ )
+    InstallWrapper(mode,
+        m,
+        bwd_maparg,
+        motion.bwd.rhs,
+        motion.fwd.rhs
+        )
 
-    " add the motion in a db, so that we can retrieve info about it later;
-    " in particular its rhs
-    call add(repeatable_motions, motion)
+    # add the motion in a db, so that we can retrieve info about it later;
+    # in particular its rhs
+    add(repmo, motion)
 
-    if a:islocal
-        " Why?{{{
-        "
-        " When the filetype plugins are re-sourced (`:e`), Vim removes the local
-        " mappings (`b:undo_ftplugin`).   But, our current plugin  hasn't erased
-        " the repeatable wrappers from its database (b:repeatable_motions).
-        "
-        " We  must eliminate  the  database whenever  the  filetype plugins  are
-        " resourced.  We could do it directly from the Vim filetype plugins, but
-        " it  seems unreliable.   We'll undoubtedly  forget to  do it  sometimes
-        " for  other  filetypes.   Instead,  the current  plugin  should  update
-        " `b:undo_ftplugin`.
-        "}}}
-        call s:UpdateUndoFtplugin()
+    if islocal
+        # Why?{{{
+        #
+        # When the filetype plugins are re-sourced (`:e`), Vim removes the local
+        # mappings (`b:undo_ftplugin`).   But, our current plugin  hasn't erased
+        # the repeatable wrappers from its database (b:repeatable_motions).
+        #
+        # We  must eliminate  the  database whenever  the  filetype plugins  are
+        # resourced.  We could do it directly from the Vim filetype plugins, but
+        # it  seems unreliable.   We'll undoubtedly  forget to  do it  sometimes
+        # for  other  filetypes.   Instead,  the current  plugin  should  update
+        # `b:undo_ftplugin`.
+        #}}}
+        UpdateUndoFtplugin()
     endif
-endfu
+enddef
 
 def Move(lhs: string, _: any): string #{{{2
 #                     ^{{{
@@ -343,14 +351,14 @@ def Move(lhs: string, _: any): string #{{{2
 #                     only used to make the output of `:map` more readable,
 #                     and still be able to find the mapping by looking for a keyword after running `:FzMaps`
 #}}}
-    var motion = GetMotionInfo(lhs)
+    var motion: dict<any> = GetMotionInfo(lhs)
 
     # if for some reason, no motion in the db matches `lhs`
     if type(motion) != v:t_dict
         return ''
     endif
 
-    var dir = GetDirection(lhs, motion)
+    var dir: string = GetDirection(lhs, motion)
 
     # Why don't you translate `lhs`?{{{
     #
@@ -398,7 +406,7 @@ def MoveAgain(dir: string) #{{{2
         return
     endif
 
-    var motion = GetMotionInfo(last_motion)
+    var motion: dict<any> = GetMotionInfo(last_motion)
     # How could we get an unrecognized motion?{{{
     #
     # You have a motion defined in a given mode.
@@ -511,7 +519,7 @@ def Populate( #{{{2
     is_fwd: bool,
     maparg: any
     )
-    var dir = is_fwd ? 'fwd' : 'bwd'
+    var dir: string = is_fwd ? 'fwd' : 'bwd'
 
     # make a custom mapping repeatable
     if !empty(maparg)
@@ -644,24 +652,24 @@ def GetCurrentMode(): string #{{{2
 enddef
 
 def GetDirection(lhs: string, motion: dict<any>): string #{{{2
-    #            ┌ no need to translate: it has been translated in a mapping
-    #            │      ┌ no need to translate: it has been translated in `Populate()`
-    #            │      │
-    var is_fwd = lhs == motion.fwd.lhs
+    #                  ┌ no need to translate: it has been translated in a mapping
+    #                  │      ┌ no need to translate: it has been translated in `Populate()`
+    #                  │      │
+    var is_fwd: bool = lhs == motion.fwd.lhs
     return is_fwd ? 'fwd' : 'bwd'
 enddef
 
 def GetMapcmd(mode: string, maparg: dict<any>): string #{{{2
-    #                 ┌ the value of the 'noremap' key stands for the NON-recursiveness{{{
-    #                 │ but we want a flag standing for the recursiveness
-    #                 │ so we need to invert the value of the key
-    #                 │
-    #                 │                       ┌ by default, we don't want
-    #                 │                       │ a recursive wrapper mapping
-    #                 │                       │}}}
-    var isrecursive = !get(maparg, 'noremap', true)
+    #                       ┌ the value of the 'noremap' key stands for the NON-recursiveness{{{
+    #                       │ but we want a flag standing for the recursiveness
+    #                       │ so we need to invert the value of the key
+    #                       │
+    #                       │                       ┌ by default, we don't want
+    #                       │                       │ a recursive wrapper mapping
+    #                       │                       │}}}
+    var isrecursive: bool = !get(maparg, 'noremap', true)
 
-    var mapcmd = isrecursive ? RECURSIVE_MAPCMD[mode] : NON_RECURSIVE_MAPCMD[mode]
+    var mapcmd: string = isrecursive ? RECURSIVE_MAPCMD[mode] : NON_RECURSIVE_MAPCMD[mode]
     mapcmd ..= ' <expr>'
     mapcmd ..= map(['buffer', 'nowait', 'silent', 'script'],
                     (_, v) => get(maparg, v, 0) ? '<' .. v .. '>' : '')
@@ -677,10 +685,10 @@ def GetMotionInfo(lhs: string): dict<any> #{{{2
     #    - whose mode is identical to the one in which we currently are
     #}}}
 
-    var mode = GetCurrentMode()
-    var motions = maparg(lhs, mode, false, true)->get('buffer', 0)
-        ? get(b:, 'repeatable_motions', [])
-        : repeatable_motions
+    var mode: string = GetCurrentMode()
+    var motions: list<dict<any>> = maparg(lhs, mode, false, true)->get('buffer', 0)
+        ?     get(b:, 'repeatable_motions', [])
+        :     repeatable_motions
 
     for m in motions
         # Why don't you translate `lhs` to normalize it?{{{
@@ -768,7 +776,7 @@ def InstallWrapper( #{{{2
     # `>t` mapping by  looking for the keyword "tab" or  "tabpage" after running
     # `:FzMaps`.
     #}}}
-    var mapcmd = GetMapcmd(mode, maparg)
+    var mapcmd: string = GetMapcmd(mode, maparg)
     exe printf('%s %s <sid>Move(%s, %s)', mapcmd, m.bwd, string(m.bwd), string(orig_rhs_bwd))
     exe printf('%s %s <sid>Move(%s, %s)', mapcmd, m.fwd, string(m.fwd), string(orig_rhs_fwd))
 enddef
@@ -780,7 +788,7 @@ def Maparg( #{{{2
     dict: bool,
     from: string
     ): dict<any>
-    var maparg = maparg(name, mode, abbr, dict)
+    var maparg: dict<any> = maparg(name, mode, abbr, dict)
     # Why this guard?{{{
     #
     # If `maparg()` is empty, we're working on a built-in motion.
@@ -872,7 +880,7 @@ def Maparg( #{{{2
     return maparg
 enddef
 
-def repmap#make#shareEnv() #{{{2
+def repmap#make#shareEnv(): list<string> #{{{2
     return repeatable_motions
 enddef
 

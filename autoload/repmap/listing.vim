@@ -1,18 +1,22 @@
-if exists('g:autoloaded_repmap#listing')
-    finish
-endif
-let g:autoloaded_repmap#listing = 1
+vim9 noclear
 
-" Init {{{1
+if exists('loaded') | finish | endif
+var loaded = true
 
-const s:REPEATABLE_MOTIONS = repmap#make#shareEnv()
-const s:MODE2LETTER = {'normal': 'n', 'visual': 'x', 'operator-pending': 'no', 'nvo': ' '}
+# Init {{{1
 
-" Interface {{{1
-fu repmap#listing#complete(arglead, cmdline, pos) abort "{{{2
-    let from_dash_to_cursor = matchstr(a:cmdline, '.*\s\zs-.*\%' .. (a:pos + 1) .. 'c')
-    if from_dash_to_cursor =~# '-mode\s\+\w*$'
-        let modes =<< trim END
+const REPEATABLE_MOTIONS: list<dict<any>> = repmap#make#shareEnv()
+const MODE2LETTER: dict<string> = {normal: 'n', visual: 'x', operator-pending: 'no', nvo: ' '}
+
+# Interface {{{1
+def repmap#listing#complete( #{{{2
+    arglead: string,
+    cmdline: string,
+    pos: number
+    ): string
+    var from_dash_to_cursor: string = matchstr(cmdline, '.*\s\zs-.*\%' .. (pos + 1) .. 'c')
+    if from_dash_to_cursor =~ '-mode\s\+\w*$'
+        var modes: list<string> =<< trim END
             normal
             visual
             operator-pending
@@ -20,11 +24,11 @@ fu repmap#listing#complete(arglead, cmdline, pos) abort "{{{2
         END
         return join(modes, "\n")
 
-    elseif from_dash_to_cursor =~# '-scope\s\+\w*$'
+    elseif from_dash_to_cursor =~ '-scope\s\+\w*$'
         return "local\nglobal"
 
-    elseif empty(a:arglead) || a:arglead[0] is# '-'
-        let opt =<< trim END
+    elseif empty(arglead) || arglead[0] == '-'
+        var opt: list<string> =<< trim END
             -mode
             -scope
             -v
@@ -34,112 +38,113 @@ fu repmap#listing#complete(arglead, cmdline, pos) abort "{{{2
     endif
 
     return ''
-endfu
+enddef
 
-fu repmap#listing#main(...) abort "{{{2
-    " get the asked options
-    let cmd_args = split(a:1)
-    let opt = {
-        \ 'mode': matchstr(a:1, '-mode\s\+\zs[-a-z]\+'),
-        \ 'scope': matchstr(a:1, '-scope\s\+\zs\w\+'),
-        \ 'verbose1': index(cmd_args, '-v') >= 0,
-        \ 'verbose2': index(cmd_args, '-vv') >= 0,
-        \ }
-    " if we add too many `v` flags by accident, we still want the maximum verbosity level
-    if match(a:1, '-vvv\+') >= 0
-        let opt.verbose2 = v:true
+def repmap#listing#main(args: string) #{{{2
+    # get the asked options
+    var cmd_args: list<string> = split(args)
+    var opt: dict<any> = {
+        mode: matchstr(args, '-mode\s\+\zs[-a-z]\+'),
+        scope: matchstr(args, '-scope\s\+\zs\w\+'),
+        verbose1: index(cmd_args, '-v') >= 0,
+        verbose2: index(cmd_args, '-vv') >= 0,
+        }
+    # if we add too many `v` flags by accident, we still want the maximum verbosity level
+    if match(args, '-vvv\+') >= 0
+        opt.verbose2 = true
     endif
-    let opt.mode = has_key(s:MODE2LETTER, opt.mode) ? s:MODE2LETTER[opt.mode] : ''
+    opt.mode = has_key(MODE2LETTER, opt.mode) ? MODE2LETTER[opt.mode] : ''
 
-    " get the text to display
-    let s:listing = {'global': [], 'local': []}
-    call s:populate_listing(opt)
+    # get the text to display
+    listing = {global: [], local: []}
+    PopulateListing(opt)
 
-    " display it
-    let excmd = 'RepeatableMotions ' .. a:1
-    call debug#log#output({'excmd': excmd, 'lines': s:get_lines()})
-    call s:customize_preview_window()
-endfu
-" }}}1
-" Core {{{1
-fu s:populate_listing(opt) abort "{{{2
-    let lists = a:opt.scope is# 'local'
-            \ ?     [get(b:, 'repeatable_motions', [])]
-            \ : a:opt.scope is# 'global'
-            \ ?     [s:REPEATABLE_MOTIONS]
-            \ :     [get(b:, 'repeatable_motions', []), s:REPEATABLE_MOTIONS]
+    # display it
+    var excmd: string = 'RepeatableMotions ' .. args
+    debug#log#output({excmd: excmd, lines: GetLines()})
+    CustomizePreviewWindow()
+enddef
+var listing: dict<list<string>>
+# }}}1
+# Core {{{1
+def PopulateListing(opt: dict<any>) #{{{2
+    var lists: list<list<dict<any>>> = opt.scope == 'local'
+            ?     [get(b:, 'repeatable_motions', [])]
+            : opt.scope == 'global'
+            ?     [REPEATABLE_MOTIONS]
+            :     [get(b:, 'repeatable_motions', []), REPEATABLE_MOTIONS]
 
     for a_list in lists
-        let scope = a_list is# s:REPEATABLE_MOTIONS ? 'global' : 'local'
+        var scope: string = a_list == REPEATABLE_MOTIONS ? 'global' : 'local'
         for m in a_list
-            if !empty(a:opt.mode) && a:opt.mode isnot# m.bwd.mode
+            if !empty(opt.mode) && opt.mode != m.bwd.mode
                 continue
             endif
 
-            call s:add_text_to_write(a:opt, m, scope)
+            AddTextToWrite(opt, m, scope)
         endfor
     endfor
-endfu
+enddef
 
-fu s:add_text_to_write(opt, m, scope) abort "{{{2
-    let text = printf('  %s  %s | %s',
-        \ a:m.bwd.mode, a:m.bwd.untranslated_lhs, a:m.fwd.untranslated_lhs)
-    let text ..= a:opt.verbose1
-        \ ?     '    ' .. a:m['original mapping']
-        \ :     ''
+def AddTextToWrite(opt: dict<any>, m: dict<any>, scope: string) #{{{2
+    var text: string = printf('  %s  %s | %s',
+        m.bwd.mode, m.bwd.untranslated_lhs, m.fwd.untranslated_lhs)
+    text ..= opt.verbose1
+        ?     '    ' .. m['original mapping']
+        :     ''
 
-    let lines = [text]
-    if a:opt.verbose2
-        " Why `extend()`?{{{
-        "
-        " Why didn't you wrote earlier:
-        "
-        "     let line ..= "\n"
-        "     \         .. '       ' .. a:m['original mapping'] .. "\n"
-        "     \         .. '       Made repeatable from ' .. a:m['made repeatable from']
-        "     \         .. "\n"
-        "
-        " Because   eventually,   we're   going    to   write   the   text   via
-        " `debug#log#output()`  which  itself  invokes `writefile()`.   And  the
-        " latter writes "\n" as a NUL.
-        " The only way to make `writefile()` write a newline is to split the lines
-        " into several list items.
-        "}}}
-        call extend(lines,
-            \   ['       ' .. a:m['original mapping']]
-            \ + ['       Made repeatable from ' .. a:m['made repeatable from']]
-            \ + [''])
+    var lines: list<string> = [text]
+    if opt.verbose2
+        # Why `extend()`?{{{
+        #
+        # Why didn't you wrote earlier:
+        #
+        #     var line ..= "\n"
+        #               .. '       ' .. m['original mapping'] .. "\n"
+        #               .. '       Made repeatable from ' .. m['made repeatable from']
+        #               .. "\n"
+        #
+        # Because   eventually,   we're   going    to   write   the   text   via
+        # `debug#log#output()`  which  itself  invokes `writefile()`.   And  the
+        # latter writes "\n" as a NUL.
+        # The only way to make `writefile()` write a newline is to split the lines
+        # into several list items.
+        #}}}
+        extend(lines,
+              ['       ' .. m['original mapping']]
+            + ['       Made repeatable from ' .. m['made repeatable from']]
+            + [''])
     endif
 
-    call extend(s:listing[a:scope], lines)
-endfu
+    extend(listing[scope], lines)
+enddef
 
-fu s:get_lines() abort "{{{2
-    if empty(s:listing.global) && empty(s:listing.local)
+def GetLines(): list<string> #{{{2
+    if empty(listing.global) && empty(listing.local)
         return []
     else
-        let lines = []
+        var lines: list<string> = []
         for scope in ['global', 'local']
-            if !empty(s:listing[scope])
-                let lines += ['', scope, '']
-                for a_line in s:listing[scope]
-                    let lines += [a_line]
+            if !empty(listing[scope])
+                lines += ['', scope, '']
+                for a_line in listing[scope]
+                    lines += [a_line]
                 endfor
             endif
         endfor
         return lines
     endif
-endfu
-" }}}1
-" Misc. {{{1
-fu s:customize_preview_window() abort "{{{2
+enddef
+# }}}1
+# Misc. {{{1
+def CustomizePreviewWindow() #{{{2
     if &l:pvw
-        call matchadd('Title', '^Motions repeated with:', 0)
-        call matchadd('SpecialKey', '^\%(global\|local\)$', 0)
+        matchadd('Title', '^Motions repeated with:', 0)
+        matchadd('SpecialKey', '^\%(global\|local\)$', 0)
 
         nno <buffer><nowait> ]] <cmd>call search('^\%(Motions\<bar>local\<bar>global\)')<cr>
         nno <buffer><nowait> [[ <cmd>call search('^\%(Motions\<bar>local\<bar>global\)', 'b')<cr>
-        sil! 1/^Motions/
+        sil! :1/^Motions/
     endif
-endfu
+enddef
 
