@@ -67,7 +67,7 @@ endtry
 var last_motion: string
 
 # database for global motions, which will be populated progressively
-var repeatable_motions: list<string> = []
+var repeatable_motions: list<dict<any>> = []
 
 var KEYCODES: any =<< trim END
     <BS>
@@ -880,7 +880,7 @@ def Maparg( #{{{2
     return maparg
 enddef
 
-def repmap#make#shareEnv(): list<string> #{{{2
+def repmap#make#shareEnv(): list<dict<any>> #{{{2
     return repeatable_motions
 enddef
 
