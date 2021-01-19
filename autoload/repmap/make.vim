@@ -538,8 +538,8 @@ def Populate( #{{{2
     # make a built-in motion repeatable
     else
         motion[dir] = deepcopy(DEFAULT_MAPARG)
-            ->extend({'mode': empty(mode) ? ' ' : mode})
-        #                Why? ┘{{{
+            ->extend({mode: empty(mode) ? ' ' : mode})
+        #              Why? ┘{{{
         #
         # Because if `maparg()`  doesn't give any info, we want  to fall back on
         # the mode `nvo`.  And to be  consistent, we want to populate our motion
