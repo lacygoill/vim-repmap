@@ -301,7 +301,7 @@ def MakeRepeatable( #{{{2
 
     # What does `repeatable_motions` contain?{{{
     #
-    # A reference to a list of motions:  `[s:|b:]repeatable_motions`
+    # A reference to a list of motions:  `[b:]repeatable_motions`
     #}}}
     #   Why is it a reference, and not a value?{{{
     #
@@ -416,7 +416,7 @@ def MoveAgain(dir: string) #{{{2
     # The last motion is  local to a buffer, you change the  buffer, and in this
     # one the motion doesn't exist...
     #}}}
-    if type(motion) != v:t_dict
+    if motion == {}
         return
     endif
 
