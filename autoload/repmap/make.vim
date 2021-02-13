@@ -220,7 +220,7 @@ def MakeRepeatable( #{{{2
     var fwd_maparg: dict<any> = Maparg(fwd_lhs, mode, false, true, from)
     # Don't bail out if `Maparg()` is empty.
     # We could be working on some default motion (`maparg()` has no info for that).
-    if type(bwd_maparg) != v:t_dict || type(fwd_maparg) != v:t_dict
+    if typename(bwd_maparg) !~ '^dict' || typename(fwd_maparg) !~ '^dict'
         return
     endif
 
@@ -354,7 +354,7 @@ def Move(lhs: string, _: any): string #{{{2
     var motion: dict<any> = GetMotionInfo(lhs)
 
     # if for some reason, no motion in the db matches `lhs`
-    if type(motion) != v:t_dict
+    if typename(motion) !~ '^dict'
         return ''
     endif
 
