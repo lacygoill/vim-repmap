@@ -7,7 +7,10 @@ var loaded = true
 
 # make sure `MapSave()` and `MapRestore()` are available
 try
-    import {MapSave, MapRestore} from 'lg/map.vim'
+    import {
+        MapSave,
+        MapRestore,
+        } from 'lg/map.vim'
 #     E1048: Item not found in script: Foobar
 #     E1053: Could not import "foo/bar.vim"
 catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
@@ -264,7 +267,7 @@ def MakeRepeatable( #{{{2
     # as a REFERENCE (not as a VALUE), and the function operates in-place.
     # IOW: no need to write:
     #
-    #     var motion = Populate(motion, ...)
+    #     var motion: dict<any> = Populate(motion, ...)
     #}}}
     Populate(motion, mode, bwd_lhs, false, bwd_maparg)
     # now `motion` contains sth like:{{{
@@ -671,9 +674,9 @@ def GetMapcmd(mode: string, maparg: dict<any>): string #{{{2
 
     var mapcmd: string = isrecursive ? RECURSIVE_MAPCMD[mode] : NON_RECURSIVE_MAPCMD[mode]
     mapcmd ..= ' <expr>'
-    mapcmd ..= map(['buffer', 'nowait', 'silent', 'script'],
-                    (_, v) => get(maparg, v, 0) ? '<' .. v .. '>' : '')
-                    ->join()
+    mapcmd ..= ['buffer', 'nowait', 'silent', 'script']
+        ->map((_, v: string): string => get(maparg, v, 0) ? '<' .. v .. '>' : '')
+        ->join()
     return mapcmd
 enddef
 
