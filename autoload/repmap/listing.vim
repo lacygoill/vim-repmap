@@ -93,27 +93,18 @@ def AddTextToWrite(opt: dict<any>, m: dict<any>, scope: string) #{{{2
         ?     '    ' .. m['original mapping']
         :     ''
 
+    # Why a list of strings, and not a string?{{{
+    #
+    # Because eventually, we're going to write the text via `debug#log#output()`
+    # which itself invokes `writefile()`.  And the latter writes "\n" as a NUL.
+    # The only way to  make `writefile()` write a newline is  to split the lines
+    # into several list items.
+    #}}}
     var lines: list<string> = [text]
     if opt.verbose2
-        # Why `extend()`?{{{
-        #
-        # Why didn't you wrote earlier:
-        #
-        #     var line ..= "\n"
-        #               .. '       ' .. m['original mapping'] .. "\n"
-        #               .. '       Made repeatable from ' .. m['made repeatable from']
-        #               .. "\n"
-        #
-        # Because   eventually,   we're   going    to   write   the   text   via
-        # `debug#log#output()`  which  itself  invokes `writefile()`.   And  the
-        # latter writes "\n" as a NUL.
-        # The only way to make `writefile()` write a newline is to split the lines
-        # into several list items.
-        #}}}
-        extend(lines,
-              ['       ' .. m['original mapping']]
+        lines += ['       ' .. m['original mapping']]
             + ['       Made repeatable from ' .. m['made repeatable from']]
-            + [''])
+            + ['']
     endif
 
     extend(listing[scope], lines)
@@ -123,7 +114,7 @@ def GetLines(): list<string> #{{{2
     if empty(listing.global) && empty(listing.local)
         return []
     else
-        var lines: list<string> = []
+        var lines: list<string>
         for scope in ['global', 'local']
             if !empty(listing[scope])
                 lines += ['', scope, '']

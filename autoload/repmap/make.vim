@@ -11,23 +11,13 @@ try
         MapSave,
         MapRestore,
         } from 'lg/map.vim'
-#     E1048: Item not found in script: Foobar
-#     E1053: Could not import "foo/bar.vim"
+# E1048: Item not found in script: Foobar
+# E1053: Could not import "foo/bar.vim"
 catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     echohl ErrorMsg
     # Do not use `:throw` or `:echoerr`!{{{
     #
-    # It could  cause a weird issue,  where an exception from  `vim-cookbook` is
-    # unexpectedly not caught:
-    #
-    #     " temporarily disable vim-lg-lib in your vimrc
-    #     " (and maybe vim-fold too to reduce the noise in the next errors)
-    #     $ vim
-    #     " ignore any error due to a missing "lg#()" function during startup
-    #     :Cookbook MathIsPrime
-    #     Error detected while processing function cookbook#main[20]...cookbook#notify:~
-    #     line    2:~
-    #     E117: Unknown function: lg#popup#notification~
+    # It could trigger a bug where an exception is not caught:
     #
     # MWE:
     #
@@ -48,8 +38,6 @@ catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     #     E117: Unknown function: Unknown~
     #     " result:   'E117' is raised
     #     " expected: 'E117' is caught
-    #
-    # Update: This comment might no longer be relevant, but the MWE is still relevant.
     #}}}
     # Why `:unsilent`?{{{
     #
@@ -70,7 +58,7 @@ endtry
 var last_motion: string
 
 # database for global motions, which will be populated progressively
-var repeatable_motions: list<dict<any>> = []
+var repeatable_motions: list<dict<any>>
 
 var KEYCODES: any =<< trim END
     <BS>
@@ -395,9 +383,9 @@ def Move(lhs: string, _: any): string #{{{2
     # But `:nno` &friends automatically translate any special key in the rhs; so
     # we need to emulate this behavior, and that's why we invoke `Translate()`.
     #}}}
-    return motion[dir].expr
-        ?     eval(motion[dir].rhs)
-        :     Translate(motion[dir].rhs)
+    return motion[dir]['expr']
+        ?     eval(motion[dir]['rhs'])
+        :     Translate(motion[dir]['rhs'])
 enddef
 
 def MoveAgain(dir: string) #{{{2
@@ -440,10 +428,10 @@ def MoveAgain(dir: string) #{{{2
     # Suppose we've pressed `fx`, and now we want to repeat it with `;`.
     # In this case:
     #
-    #     motion[dir].expr = 1
-    #     motion[dir].rhs = <sid>Fts()
-    #                            │
-    #                            └ custom function defined in another script
+    #     motion[dir]['expr'] = 1
+    #     motion[dir]['rhs'] = <sid>Fts()
+    #                               │
+    #                               └ custom function defined in another script
     #
     # The code in `Fts()` is going to be evaluated, and the result typed as keys.
     # But,  `Fts()` needs  to know  whether we  are pressing  `f` to  ask for  a
@@ -492,13 +480,13 @@ def MoveAgain(dir: string) #{{{2
     #      Currently,  it  happens when  we  cycle  through the  levels  of
     #      lightness of the colorscheme (`]oL  co;  ;`).
     #}}}
-    exe GetCurrentMode() .. (!motion[dir].noremap ? 'map' : 'noremap')
-        .. (motion[dir].nowait ? ' <nowait>' : '')
-        .. (motion[dir].expr ? ' <expr>' : '')
-        .. (motion[dir].silent ? ' <silent>' : '')
-        .. (motion[dir].script ? ' <script> ' : '')
+    exe GetCurrentMode() .. (!motion[dir]['noremap'] ? 'map' : 'noremap')
+        .. (motion[dir]['nowait'] ? ' <nowait>' : '')
+        .. (motion[dir]['expr'] ? ' <expr>' : '')
+        .. (motion[dir]['silent'] ? ' <silent>' : '')
+        .. (motion[dir]['script'] ? ' <script> ' : '')
         .. ' <plug>(repeat-motion-tmp) '
-        .. motion[dir].rhs
+        .. motion[dir]['rhs']
 
     feedkeys("\<plug>(repeat-motion-tmp)", 'i')
 
@@ -533,9 +521,9 @@ def Populate( #{{{2
         # The latter automatically translates `<C-j>` into `<NL>`.
         # This will break mappings whose lhs contains `<C-j>` (e.g. `z C-j`).
         #}}}
-        if motion[dir].lhs =~ '\C<NL>'
-            motion[dir].lhs =
-                substitute(motion[dir].lhs, '\C<NL>', "\<c-j>", 'g')
+        if motion[dir]['lhs'] =~ '\C<NL>'
+            motion[dir]['lhs'] =
+                substitute(motion[dir]['lhs'], '\C<NL>', "\<c-j>", 'g')
         endif
 
     # make a built-in motion repeatable
@@ -559,17 +547,17 @@ def Populate( #{{{2
         #    - an empty string in its input
         #    - a single space in its output
         #}}}
-        motion[dir].lhs = lhs
-        motion[dir].rhs = lhs
+        motion[dir]['lhs'] = lhs
+        motion[dir]['rhs'] = lhs
     endif
 
     # we save the lhs keysequence, unmodified, so that `:RepeatableMotions`
     # has something readable to display
-    motion[dir].untranslated_lhs = motion[dir].lhs
+    motion[dir]['untranslated_lhs'] = motion[dir]['lhs']
 
     # We now translate it to normalize its form.{{{
     #
-    # `motion[dir].lhs` comes from `repmap#make#repeatable()`.
+    # `motion[dir]['lhs']` comes from `repmap#make#repeatable()`.
     # Its form depends on how the user wrote the motion.
     # Example:
     #
@@ -582,13 +570,13 @@ def Populate( #{{{2
     # between the lhs of a motion and some keysequence.
     # We must make sure that we're always comparing the same (translated) form.
     #}}}
-    motion[dir].lhs = Translate(motion[dir].lhs)
+    motion[dir]['lhs'] = Translate(motion[dir]['lhs'])
 enddef
 # }}}1
 # Util {{{1
 def CollidesWithDb( #{{{2
     motion: dict<any>,
-    repeatable_motions: list<dict<any>>
+    repmo: list<dict<any>>
     ): bool
     # Purpose:{{{
     #
@@ -623,7 +611,7 @@ def CollidesWithDb( #{{{2
 
     #   ┌ Motion
     #   │
-    for m in repeatable_motions
+    for m in repmo
         if [m.bwd.lhs, m.bwd.mode] == [motion.bwd.lhs, motion.bwd.mode]
         || [m.fwd.lhs, m.fwd.mode] == [motion.fwd.lhs, motion.fwd.mode]
             try
@@ -640,7 +628,7 @@ enddef
 def GetCurrentMode(): string #{{{2
     # Why the substitutions?{{{
     #
-    #     mode(1)->substitute("[vV\<c-v>]", 'x', ''):
+    #     mode(true)->substitute("[vV\<c-v>]", 'x', ''):
     #
     #         normalize output of `mode()` to match the one of `maparg()`
     #         in case we're in visual mode
@@ -649,7 +637,7 @@ def GetCurrentMode(): string #{{{2
     #
     #         same thing for operator-pending mode
     #}}}
-    return mode(1)
+    return mode(true)
         ->substitute("[vV\<c-v>]", 'x', '')
         ->substitute("no[vV\<c-v>]\\=", 'o', '')
 enddef
@@ -745,7 +733,7 @@ def GetMotionInfo(lhs: string): dict<any> #{{{2
         #
         # `m.bwd.mode` could  be a  space, if the  original mapping  was defined
         # with `:noremap` or `:map`.  But `mode`  will never be a space, because
-        # it gets its value from `mode(1)`, which will return:
+        # it gets its value from `mode(true)`, which will return:
         #
         #     'n', 'v', 'V', 'C-v' or 'no'
         #
@@ -879,7 +867,7 @@ def Maparg( #{{{2
     # `Move()` will translate it into a literal bar via `Translate()`.
     # And `MoveAgain()` will also translate it via an ad-hoc temporary mapping.
     #}}}
-    extend(maparg, {rhs: maparg(name, mode)->substitute('|', '<bar>', 'g')})
+    maparg.rhs = maparg(name, mode)->substitute('|', '<bar>', 'g')
     return maparg
 enddef
 
