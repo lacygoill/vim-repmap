@@ -243,7 +243,7 @@ def MakeRepeatable( #{{{2
     #}}}
 
     var origin: string = execute(
-        'verb ' .. mode .. 'map ' .. (islocal ? ' <buffer> ' : '') .. bwd_lhs
+            'verb ' .. mode .. 'map ' .. (islocal ? ' <buffer> ' : '') .. bwd_lhs
         )->matchstr('.*\n\s*\zsLast set from.*')
     var motion: dict<any> = {
         'made repeatable from': from,
@@ -522,8 +522,8 @@ def Populate( #{{{2
         # This will break mappings whose lhs contains `<C-j>` (e.g. `z C-j`).
         #}}}
         if motion[dir]['lhs'] =~ '\C<NL>'
-            motion[dir]['lhs'] =
-                substitute(motion[dir]['lhs'], '\C<NL>', "\<c-j>", 'g')
+            motion[dir]['lhs'] = motion[dir]['lhs']
+                ->substitute('\C<NL>', "\<c-j>", 'g')
         endif
 
     # make a built-in motion repeatable
@@ -633,7 +633,7 @@ def GetCurrentMode(): string #{{{2
     #         normalize output of `mode()` to match the one of `maparg()`
     #         in case we're in visual mode
     #
-    #     substitute(..., 'no', 'o', '')
+    #     ...->substitute('no', 'o', '')
     #
     #         same thing for operator-pending mode
     #}}}
@@ -660,12 +660,11 @@ def GetMapcmd(mode: string, maparg: dict<any>): string #{{{2
     #                       │                       │}}}
     var isrecursive: bool = !get(maparg, 'noremap', true)
 
-    var mapcmd: string = isrecursive ? RECURSIVE_MAPCMD[mode] : NON_RECURSIVE_MAPCMD[mode]
-    mapcmd ..= ' <expr>'
-    mapcmd ..= ['buffer', 'nowait', 'silent', 'script']
-        ->map((_, v: string): string => get(maparg, v, 0) ? '<' .. v .. '>' : '')
-        ->join()
-    return mapcmd
+    return (isrecursive ? RECURSIVE_MAPCMD[mode] : NON_RECURSIVE_MAPCMD[mode])
+        .. ' <expr>'
+        .. ['buffer', 'nowait', 'silent', 'script']
+            ->map((_, v: string): string => get(maparg, v, 0) ? '<' .. v .. '>' : '')
+            ->join()
 enddef
 
 def GetMotionInfo(lhs: string): dict<any> #{{{2
@@ -893,7 +892,7 @@ def Translate(seq: string): string #{{{2
     #                           ││ from being removed by `eval("...")`
     #                           ││
     return ('"' .. escape(seq, '"\')
-        ->substitute('\m\c\ze\%(' .. KEYCODES .. '\)', '\\', 'g') .. '"')
+        ->substitute('\c\ze\%(' .. KEYCODES .. '\)', '\\', 'g') .. '"')
         ->eval()
 enddef
 
