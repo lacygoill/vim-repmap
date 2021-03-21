@@ -53,7 +53,7 @@ def repmap#listing#main(args: string) #{{{2
     if match(args, '-vvv\+') >= 0
         opt.verbose2 = true
     endif
-    opt.mode = has_key(MODE2LETTER, opt.mode) ? MODE2LETTER[opt.mode] : ''
+    opt.mode = MODE2LETTER->has_key(opt.mode) ? MODE2LETTER[opt.mode] : ''
 
     # get the text to display
     listing = {global: [], local: []}
