@@ -85,7 +85,7 @@ var KEYCODES: any =<< trim END
     <Up>
     <lt>
 END
-KEYCODES = join(KEYCODES, '\|')
+KEYCODES = KEYCODES->join('\|')
 lockvar! KEYCODES
 
 const DEFAULT_MAPARG: dict<any> = {
@@ -113,14 +113,14 @@ const RECURSIVE_MAPCMD: dict<string> = {
     x: 'xmap',
     o: 'omap',
     '': 'map',
-    }
+}
 
 const NON_RECURSIVE_MAPCMD: dict<string> = {
     n: 'nnoremap',
     x: 'xnoremap',
     o: 'onoremap',
     '': 'noremap',
-    }
+}
 
 # Necessary to avoid `<plug>(repeat-motion-tmp)` to be sometimes written literally into the buffer.{{{
 #
@@ -151,7 +151,7 @@ def repmap#make#repeatable(what: dict<any>) #{{{2
         throw 'E8001: [repmap] missing key'
     endif
 
-    for mode in (what.mode == '' ? [''] : split(what.mode, '\zs'))
+    for mode in (what.mode == '' ? [''] : what.mode)
         # Make the motions repeatable{{{
         #
         # We need to  install a wrapper mapping around each  motion, to save the
@@ -202,7 +202,7 @@ def MakeRepeatable( #{{{2
     mode: string,
     islocal: bool,
     from: string
-    )
+)
     # can only make ONE motion repeatable
 
     var bwd_lhs: string = m.bwd
@@ -248,7 +248,7 @@ def MakeRepeatable( #{{{2
     var motion: dict<any> = {
         'made repeatable from': from,
         'original mapping': origin,
-        }
+    }
     # Why don't we write an assignment to populate `motion`?{{{
     #
     # `motion` is an array (!= scalar), so Vim passes it to `Populate()`
@@ -313,7 +313,7 @@ def MakeRepeatable( #{{{2
         bwd_maparg,
         motion.bwd.rhs,
         motion.fwd.rhs
-        )
+    )
 
     # add the motion in a db, so that we can retrieve info about it later;
     # in particular its rhs
@@ -336,7 +336,7 @@ def MakeRepeatable( #{{{2
     endif
 enddef
 
-def Move(lhs: string, _: any): string #{{{2
+def Move(lhs: string, _): string #{{{2
 #                     ^{{{
 #                     original rhs:
 #                     only used to make the output of `:map` more readable,
@@ -500,7 +500,9 @@ def MoveAgain(dir: string) #{{{2
     # command.  IOW, when the last motion  was `fx`, `f` is insufficient to know
     # where to move.
     #}}}
-    timer_start(0, () => execute('is_repeating_motion = false'))
+    timer_start(0, (_) => {
+        is_repeating_motion = false
+    })
 enddef
 
 def Populate( #{{{2
@@ -509,7 +511,7 @@ def Populate( #{{{2
     lhs: string,
     is_fwd: bool,
     maparg: any
-    )
+)
     var dir: string = is_fwd ? 'fwd' : 'bwd'
 
     # make a custom mapping repeatable
@@ -577,7 +579,7 @@ enddef
 def CollidesWithDb( #{{{2
     motion: dict<any>,
     repmo: list<dict<any>>
-    ): bool
+): bool
     # Purpose:{{{
     #
     # Detect whether the motion we're trying  to make repeatable collides with
@@ -750,7 +752,7 @@ def InstallWrapper( #{{{2
     maparg: dict<any>,
     orig_rhs_bwd: string,
     orig_rhs_fwd: string
-    )
+)
     # Why do you pass the original rhs of the mappings to `Move()`?{{{
     #
     # `Move()` doesn't need it.
@@ -777,7 +779,8 @@ def Maparg( #{{{2
     abbr: bool,
     dict: bool,
     from: string
-    ): dict<any>
+): dict<any>
+
     var maparg: dict<any> = maparg(name, mode, abbr, dict)
     # Why this guard?{{{
     #

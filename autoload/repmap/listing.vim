@@ -13,7 +13,8 @@ def repmap#listing#complete( #{{{2
     arglead: string,
     cmdline: string,
     pos: number
-    ): string
+): string
+
     var from_dash_to_cursor: string = matchstr(cmdline, '.*\s\zs-.*\%' .. (pos + 1) .. 'c')
     if from_dash_to_cursor =~ '-mode\s\+\w*$'
         var modes: list<string> =<< trim END
@@ -22,7 +23,7 @@ def repmap#listing#complete( #{{{2
             operator-pending
             nvo
         END
-        return join(modes, "\n")
+        return modes->join("\n")
 
     elseif from_dash_to_cursor =~ '-scope\s\+\w*$'
         return "local\nglobal"
@@ -34,7 +35,7 @@ def repmap#listing#complete( #{{{2
             -v
             -vv
         END
-        return join(opt, "\n")
+        return opt->join("\n")
     endif
 
     return ''
@@ -48,7 +49,7 @@ def repmap#listing#main(args: string) #{{{2
         scope: matchstr(args, '-scope\s\+\zs\w\+'),
         verbose1: index(cmd_args, '-v') >= 0,
         verbose2: index(cmd_args, '-vv') >= 0,
-        }
+    }
     # if we add too many `v` flags by accident, we still want the maximum verbosity level
     if match(args, '-vvv\+') >= 0
         opt.verbose2 = true
@@ -86,7 +87,11 @@ def PopulateListing(opt: dict<any>) #{{{2
     endfor
 enddef
 
-def AddTextToWrite(opt: dict<any>, m: dict<any>, scope: string) #{{{2
+def AddTextToWrite( #{{{2
+    opt: dict<any>,
+    m: dict<any>,
+    scope: string
+)
     var text: string = printf('  %s  %s | %s',
         m.bwd.mode, m.bwd.untranslated_lhs, m.fwd.untranslated_lhs)
     text ..= opt.verbose1
@@ -107,7 +112,7 @@ def AddTextToWrite(opt: dict<any>, m: dict<any>, scope: string) #{{{2
             + ['']
     endif
 
-    extend(listing[scope], lines)
+    listing[scope] += lines
 enddef
 
 def GetLines(): list<string> #{{{2
