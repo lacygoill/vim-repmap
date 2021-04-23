@@ -384,9 +384,22 @@ def Move(lhs: string, _): string #{{{2
     # we need to emulate this behavior, and that's why we invoke `Translate()`.
     #}}}
     return motion[dir]['expr']
-        ?     eval(motion[dir]['rhs'])
+        ?     Eval(motion[dir]['rhs'])
         :     Translate(motion[dir]['rhs'])
 enddef
+
+# The rhs needs to be evaluated in the legacy context to avoid `E1010`.{{{
+#
+# If  you evaluate  the rhs  in the  Vim9 context,  `E1010` will  be raised  for
+# mappings installed with the `<expr>` argument, and whose rhs is a script-local
+# function.
+#
+# That's because, in Vim9 since 8.2.2799, Vim wrongly parses `<SNR>` as a type cast.
+# See: https://github.com/vim/vim/issues/8137
+#}}}
+fu Eval(rhs) abort
+    return eval(a:rhs)
+endfu
 
 def MoveAgain(dir: string) #{{{2
     # This function is called by various mappings whose suffix is `,` or `;`.
@@ -759,13 +772,13 @@ def InstallWrapper( #{{{2
     # But it makes the output of `:map` more readable:
     #
     #     " wtf does this mapping?
-    #     n  >t          * <SNR>145_Move('>t')
+    #     n  gt          * <SNR>34_Move('gt')
     #
     #     " ok, this mapping moves a tab page
-    #     n  >t          * <SNR>145_Move('>t', '<Cmd>call <SNR>144_move_tabpage(''+1'')<CR>')
+    #     n  gt          * <SNR>34_Move('gt', '<Cmd>call <SNR>12_MoveTabpage()<CR>')
     #
     # And more  useful; without the  original rhs,  it's impossible to  find the
-    # `>t` mapping by  looking for the keyword "tab" or  "tabpage" after running
+    # `gt` mapping by  looking for the keyword "tab" or  "tabpage" after running
     # `:FzMaps`.
     #}}}
     var mapcmd: string = GetMapcmd(mode, maparg)
