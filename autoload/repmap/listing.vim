@@ -5,8 +5,12 @@ var loaded = true
 
 # Init {{{1
 
-const REPEATABLE_MOTIONS: list<dict<any>> = repmap#make#shareEnv()
-const MODE2LETTER: dict<string> = {normal: 'n', visual: 'x', operator-pending: 'no', nvo: ' '}
+const MODE2LETTER: dict<string> = {
+    normal: 'n',
+    visual: 'x',
+    operator-pending: 'no',
+    nvo: ' ',
+}
 
 # Interface {{{1
 def repmap#listing#complete( #{{{2
@@ -15,7 +19,7 @@ def repmap#listing#complete( #{{{2
     pos: number
 ): string
 
-    var from_dash_to_cursor: string = matchstr(cmdline, '.*\s\zs-.*\%' .. (pos + 1) .. 'c')
+    var from_dash_to_cursor: string = cmdline->matchstr('.*\s\zs-.*\%' .. (pos + 1) .. 'c')
     if from_dash_to_cursor =~ '-mode\s\+\w*$'
         var modes: list<string> =<< trim END
             normal
@@ -45,10 +49,10 @@ def repmap#listing#main(args: string) #{{{2
     # get the asked options
     var cmd_args: list<string> = split(args)
     var opt: dict<any> = {
-        mode: matchstr(args, '-mode\s\+\zs[-a-z]\+'),
-        scope: matchstr(args, '-scope\s\+\zs\w\+'),
-        verbose1: index(cmd_args, '-v') >= 0,
-        verbose2: index(cmd_args, '-vv') >= 0,
+        mode: args->matchstr('-mode\s\+\zs[-a-z]\+'),
+        scope: args->matchstr('-scope\s\+\zs\w\+'),
+        verbose1: cmd_args->index('-v') >= 0,
+        verbose2: cmd_args->index('-vv') >= 0,
     }
     # if we add too many `v` flags by accident, we still want the maximum verbosity level
     if match(args, '-vvv\+') >= 0
@@ -69,14 +73,15 @@ var listing: dict<list<string>>
 # }}}1
 # Core {{{1
 def PopulateListing(opt: dict<any>) #{{{2
+    var repeatable_motions: list<dict<any>> = repmap#make#shareEnv()
     var lists: list<list<dict<any>>> = opt.scope == 'local'
             ?     [get(b:, 'repeatable_motions', [])]
             : opt.scope == 'global'
-            ?     [REPEATABLE_MOTIONS]
-            :     [get(b:, 'repeatable_motions', []), REPEATABLE_MOTIONS]
+            ?     [repeatable_motions]
+            :     [get(b:, 'repeatable_motions', []), repeatable_motions]
 
     for a_list in lists
-        var scope: string = a_list == REPEATABLE_MOTIONS ? 'global' : 'local'
+        var scope: string = a_list == repeatable_motions ? 'global' : 'local'
         for m in a_list
             if !empty(opt.mode) && opt.mode != m.bwd.mode
                 continue

@@ -388,14 +388,36 @@ def Move(lhs: string, _): string #{{{2
         :     Translate(motion[dir]['rhs'])
 enddef
 
-# The rhs needs to be evaluated in the legacy context to avoid `E1010`.{{{
+# The rhs needs to be evaluated in the legacy context.{{{
 #
-# If  you evaluate  the rhs  in the  Vim9 context,  `E1010` will  be raised  for
-# mappings installed with the `<expr>` argument, and whose rhs is a script-local
-# function.
+#     $ vim -Nu NONE -S <(cat <<'EOF'
+#         vim9script
+#         nno <expr> <F3> {-> 'no error'}()
+#         echo maparg('<F3>')->eval()
+#     EOF
+#     )
+#     E720: Missing colon in Dictionary: > 'no error'}()~
+#     E15: Invalid expression: {-> 'no error'}()~
 #
-# That's because, in Vim9 since 8.2.2799, Vim wrongly parses `<SNR>` as a type cast.
-# See: https://github.com/vim/vim/issues/8137
+#     $ vim -Nu NONE -S <(cat <<'EOF'
+#         vim9script
+#         nno <expr> <F3> {-> 'no error'}()
+#         fu Legacy()
+#             echo maparg('<F3>')->eval()
+#         endfu
+#         Legacy()
+#     EOF
+#     )
+#     no error~
+#
+# ---
+#
+# Besides, if you evaluate  the rhs in the Vim9 context,  `E1010` will be raised
+# for  mappings  installed with  the  `<expr>`  argument,  and  whose rhs  is  a
+# script-local function.
+#
+# That's because, in Vim9 since 8.2.2799,  Vim parses `<SNR>` as an invalid type
+# cast.  See: https://github.com/vim/vim/issues/8137
 #}}}
 fu Eval(rhs) abort
     return eval(a:rhs)
