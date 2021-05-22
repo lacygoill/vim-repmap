@@ -34,8 +34,8 @@ catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     #         endtry
     #     EOF
     #     )
-    #     ...~
-    #     E117: Unknown function: Unknown~
+    #     ...˜
+    #     E117: Unknown function: Unknown˜
     #     " result:   'E117' is raised
     #     " expected: 'E117' is caught
     #}}}
@@ -396,8 +396,8 @@ enddef
 #         echo maparg('<F3>')->eval()
 #     EOF
 #     )
-#     E720: Missing colon in Dictionary: > 'no error'}()~
-#     E15: Invalid expression: {-> 'no error'}()~
+#     E720: Missing colon in Dictionary: > 'no error'}()˜
+#     E15: Invalid expression: {-> 'no error'}()˜
 #
 #     $ vim -Nu NONE -S <(cat <<'EOF'
 #         vim9script
@@ -408,7 +408,7 @@ enddef
 #         Legacy()
 #     EOF
 #     )
-#     no error~
+#     no error˜
 #
 # ---
 #
@@ -825,7 +825,7 @@ def Maparg( #{{{2
     #
     # If you allow it, `Populate()` will raise `E716`.
     #
-    #     E716: Key not present in Dictionary: lhs ...~
+    #     E716: Key not present in Dictionary: lhs ...˜
     #
     # This is  because `Populate()` will  wrongly think  that it's working  on a
     # custom motion instead of a built-in one.
@@ -860,7 +860,7 @@ def Maparg( #{{{2
     #     noremap <c-q> <esc>
     #     nunmap <c-q>
     #     map <c-q>
-    #     ov <C-Q>       * <Esc>~
+    #     ov <C-Q>       * <Esc>˜
     #     ^^
     #
     # Such a motion can't be made repeatable.
@@ -872,8 +872,8 @@ def Maparg( #{{{2
     #     # `#restore()` should reinstall the motion via several mapping commands
     #     MapSave('<c-q>')->MapRestore()
     #     map <c-q>
-    #     o  <C-Q>       * <Esc>~
-    #     v  <C-Q>       * <Esc>~
+    #     o  <C-Q>       * <Esc>˜
+    #     v  <C-Q>       * <Esc>˜
     #}}}
     if mode != maparg.mode && !(mode == '' && maparg.mode == ' ')
     #                          ├────────────────────────────────┘
