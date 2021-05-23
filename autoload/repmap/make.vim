@@ -317,7 +317,7 @@ def MakeRepeatable( #{{{2
 
     # add the motion in a db, so that we can retrieve info about it later;
     # in particular its rhs
-    add(repmo, motion)
+    repmo->add(motion)
 
     if islocal
         # Why?{{{
