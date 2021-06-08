@@ -217,7 +217,7 @@ def MakeRepeatable( #{{{2
 
     # if we ask for a local motion to be made repeatable,
     # the 2 lhs should be used in local mappings
-    if islocal && (!get(bwd_maparg, 'buffer', 0) || !get(fwd_maparg, 'buffer', 0))
+    if islocal && (!get(bwd_maparg, 'buffer', false) || !get(fwd_maparg, 'buffer', false))
         throw 'E8002: [repmap] invalid motion: ' .. from
     endif
 
@@ -234,9 +234,9 @@ def MakeRepeatable( #{{{2
     # `Move('lhs')`.
     # At the end, Vim  would compute the keys to press: the  latter would be the
     # output of  `Move('lhs')`.  That's  where the  recursion comes  from.  It's
-    # like pressing `cd`, where `cd` is defined like so:
+    # like pressing `F3`, where `F3` is defined like so:
     #
-    #     nno <expr> cd Func()
+    #     nno <expr> <F3> Func()
     #     fu Func()
     #         return Func()
     #     endfu
@@ -700,7 +700,7 @@ def GetMapcmd(mode: string, maparg: dict<any>): string #{{{2
     return (isrecursive ? RECURSIVE_MAPCMD[mode] : NON_RECURSIVE_MAPCMD[mode])
         .. ' <expr>'
         .. ['buffer', 'nowait', 'silent', 'script']
-            ->map((_, v: string): string => get(maparg, v, 0) ? '<' .. v .. '>' : '')
+            ->map((_, v: string): string => get(maparg, v, false) ? '<' .. v .. '>' : '')
             ->join()
 enddef
 
@@ -713,7 +713,7 @@ def GetMotionInfo(lhs: string): dict<any> #{{{2
     #}}}
 
     var mode: string = GetCurrentMode()
-    var motions: list<dict<any>> = maparg(lhs, mode, false, true)->get('buffer', 0)
+    var motions: list<dict<any>> = maparg(lhs, mode, false, true)->get('buffer', false)
         ?     get(b:, 'repeatable_motions', [])
         :     repeatable_motions
 

@@ -139,7 +139,7 @@ enddef
 # }}}1
 # Misc. {{{1
 def CustomizePreviewWindow() #{{{2
-    if &l:pvw
+    if &l:previewwindow
         matchadd('Title', '^Motions repeated with:', 0)
         matchadd('SpecialKey', '^\%(global\|local\)$', 0)
 
