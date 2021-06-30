@@ -143,9 +143,9 @@ def CustomizePreviewWindow() #{{{2
         matchadd('Title', '^Motions repeated with:', 0)
         matchadd('SpecialKey', '^\%(global\|local\)$', 0)
 
-        nno <buffer><nowait> ]] <cmd>call search('^\%(Motions\<bar>local\<bar>global\)')<cr>
-        nno <buffer><nowait> [[ <cmd>call search('^\%(Motions\<bar>local\<bar>global\)', 'b')<cr>
-        sil! :1/^Motions/
+        nnoremap <buffer><nowait> ]] <Cmd>call search('^\%(Motions\<Bar>local\<Bar>global\)')<CR>
+        nnoremap <buffer><nowait> [[ <Cmd>call search('^\%(Motions\<Bar>local\<Bar>global\)', 'b')<CR>
+        silent! :1/^Motions/
     endif
 enddef
 

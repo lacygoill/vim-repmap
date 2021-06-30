@@ -22,12 +22,12 @@ catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     # MWE:
     #
     #     $ vim -Nu NONE -S <(cat <<'EOF'
-    #         fu Throw()
+    #         function Throw()
     #             try
     #                 throw 'error'
     #             endtry
-    #         endfu
-    #         sil! call Throw()
+    #         endfunction
+    #         silent! call Throw()
     #         try
     #             call Unknown()
     #         catch
@@ -44,7 +44,7 @@ catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     # `#repeatable()` may be invoked from a filetype plugin.
     # And in that case, messages are silent.
     #}}}
-    unsilent echom 'E8000: [repmap] the vim-lg-lib dependency is missing'
+    unsilent echomsg 'E8000: [repmap] the vim-lg-lib dependency is missing'
     echohl NONE
     finish
 endtry
@@ -122,7 +122,7 @@ const NON_RECURSIVE_MAPCMD: dict<string> = {
     '': 'noremap',
 }
 
-# Necessary to avoid `<plug>(repeat-motion-tmp)` to be sometimes written literally into the buffer.{{{
+# Necessary to avoid `<Plug>(repeat-motion-tmp)` to be sometimes written literally into the buffer.{{{
 #
 # That can happen when we press something like `fx` then `c;` (assuming there is
 # an `x` character in the buffer).
@@ -130,17 +130,17 @@ const NON_RECURSIVE_MAPCMD: dict<string> = {
 # You might  wonder how that's possible.   After all, when this  `feedkeys()` is
 # invoked:
 #
-#     call feedkeys("\<plug>(repeat-motion-tmp)", 'i')
+#     call feedkeys("\<Plug>(repeat-motion-tmp)", 'i')
 #
 # We should be in operator-pending mode, right?
 # Correct.  But,  remember that `feedkeys()`  only writes keys in  the typeahead
-# buffer;  it   doesn't  execute  them.   When   `<plug>(repeat-motion-tmp)`  is
+# buffer;  it   doesn't  execute  them.   When   `<Plug>(repeat-motion-tmp)`  is
 # processed, we might be in a different mode.
 #
 # You could  fix that by  passing the `x` flag  to `feedkeys()`, but  that would
 # also cause Vim to press `Esc`, which is undesirable.
 #}}}
-ino <plug>(repeat-motion-tmp) <nop>
+inoremap <Plug>(repeat-motion-tmp) <Nop>
 
 # Interface {{{1
 def repmap#make#repeatable(what: dict<any>) #{{{2
@@ -185,8 +185,8 @@ def repmap#make#repeatable(what: dict<any>) #{{{2
         # if not already done, install the `,` and `;` mappings to repeat the motions
         if maparg(',') !~ 'MoveAgain('
             var mapcmd: string = mode .. 'noremap'
-            exe mapcmd .. " , <cmd>call <sid>MoveAgain('bwd')<cr>"
-            exe mapcmd .. " ; <cmd>call <sid>MoveAgain('fwd')<cr>"
+            execute mapcmd .. " , <Cmd>call <SID>MoveAgain('bwd')<CR>"
+            execute mapcmd .. " ; <Cmd>call <SID>MoveAgain('fwd')<CR>"
         endif
     endfor
 enddef
@@ -236,14 +236,14 @@ def MakeRepeatable( #{{{2
     # output of  `Move('lhs')`.  That's  where the  recursion comes  from.  It's
     # like pressing `F3`, where `F3` is defined like so:
     #
-    #     nno <expr> <F3> Func()
-    #     fu Func()
+    #     nnoremap <expr> <F3> Func()
+    #     function Func()
     #         return Func()
-    #     endfu
+    #     endfunction
     #}}}
 
     var origin: string = execute(
-            'verb ' .. mode .. 'map ' .. (islocal ? ' <buffer> ' : '') .. bwd_lhs
+            'verbose ' .. mode .. 'map ' .. (islocal ? ' <buffer> ' : '') .. bwd_lhs
         )->matchstr('.*\n\s*\zsLast set from.*')
     var motion: dict<any> = {
         'made repeatable from': from,
@@ -322,9 +322,10 @@ def MakeRepeatable( #{{{2
     if islocal
         # Why?{{{
         #
-        # When the filetype plugins are re-sourced (`:e`), Vim removes the local
-        # mappings (`b:undo_ftplugin`).   But, our current plugin  hasn't erased
-        # the repeatable wrappers from its database (b:repeatable_motions).
+        # When  the  filetype  plugins  are re-sourced  (`:edit`),  Vim  removes
+        # the   local   mappings    (`b:undo_ftplugin`).    But,   our   current
+        # plugin  hasn't  erased  the  repeatable  wrappers  from  its  database
+        # (`b:repeatable_motions`).
         #
         # We  must eliminate  the  database whenever  the  filetype plugins  are
         # resourced.  We could do it directly from the Vim filetype plugins, but
@@ -356,10 +357,10 @@ def Move(lhs: string, _): string #{{{2
     # No need to.
     # This function is used in the rhs of wrapper mappings:
     #
-    #     exe mapcmd .. '  ' .. m.bwd .. '  <sid>Move(' .. string(a:m.bwd) .. ')'
-    #     exe mapcmd .. '  ' .. m.fwd .. '  <sid>Move(' .. string(a:m.fwd) .. ')'
-    #                                                      ├─────────────┘
-    #                                                      └ automatically translated
+    #     execute mapcmd .. '  ' .. m.bwd .. '  <SID>Move(' .. string(a:m.bwd) .. ')'
+    #     execute mapcmd .. '  ' .. m.fwd .. '  <SID>Move(' .. string(a:m.fwd) .. ')'
+    #                                                          ├─────────────┘
+    #                                                          └ automatically translated
     #
     # And mapping commands automatically translate special keys.
     #}}}
@@ -380,8 +381,9 @@ def Move(lhs: string, _): string #{{{2
     # Why do you need to translate them otherwise?{{{
     #
     # If the mapping doesn't use `<expr>`, the rhs is *not* fed directly.
-    # But `:nno` &friends automatically translate any special key in the rhs; so
-    # we need to emulate this behavior, and that's why we invoke `Translate()`.
+    # But `:nnoremap`  &friends automatically translate  any special key  in the
+    # rhs;  so we  need  to emulate  this  behavior, and  that's  why we  invoke
+    # `Translate()`.
     #}}}
     return motion[dir]['expr']
         ?     Eval(motion[dir]['rhs'])
@@ -392,7 +394,7 @@ enddef
 #
 #     $ vim -Nu NONE -S <(cat <<'EOF'
 #         vim9script
-#         nno <expr> <F3> {-> 'no error'}()
+#         nnoremap <expr> <F3> {-> 'no error'}()
 #         echo maparg('<F3>')->eval()
 #     EOF
 #     )
@@ -401,10 +403,10 @@ enddef
 #
 #     $ vim -Nu NONE -S <(cat <<'EOF'
 #         vim9script
-#         nno <expr> <F3> {-> 'no error'}()
-#         fu Legacy()
+#         nnoremap <expr> <F3> {-> 'no error'}()
+#         function Legacy()
 #             echo maparg('<F3>')->eval()
-#         endfu
+#         endfunction
 #         Legacy()
 #     EOF
 #     )
@@ -419,9 +421,9 @@ enddef
 # That's because, in Vim9 since 8.2.2799,  Vim parses `<SNR>` as an invalid type
 # cast.  See: https://github.com/vim/vim/issues/8137
 #}}}
-fu Eval(rhs) abort
+function Eval(rhs) abort
     return eval(a:rhs)
-endfu
+endfunction
 
 def MoveAgain(dir: string) #{{{2
     # This function is called by various mappings whose suffix is `,` or `;`.
@@ -464,7 +466,7 @@ def MoveAgain(dir: string) #{{{2
     # In this case:
     #
     #     motion[dir]['expr'] = 1
-    #     motion[dir]['rhs'] = <sid>Fts()
+    #     motion[dir]['rhs'] = <SID>Fts()
     #                               │
     #                               └ custom function defined in another script
     #
@@ -515,15 +517,15 @@ def MoveAgain(dir: string) #{{{2
     #      Currently,  it  happens when  we  cycle  through the  levels  of
     #      lightness of the colorscheme (`]oL  co;  ;`).
     #}}}
-    exe GetCurrentMode() .. (!motion[dir]['noremap'] ? 'map' : 'noremap')
+    execute GetCurrentMode() .. (!motion[dir]['noremap'] ? 'map' : 'noremap')
         .. (motion[dir]['nowait'] ? ' <nowait>' : '')
         .. (motion[dir]['expr'] ? ' <expr>' : '')
         .. (motion[dir]['silent'] ? ' <silent>' : '')
         .. (motion[dir]['script'] ? ' <script> ' : '')
-        .. ' <plug>(repeat-motion-tmp) '
+        .. ' <Plug>(repeat-motion-tmp) '
         .. motion[dir]['rhs']
 
-    feedkeys("\<plug>(repeat-motion-tmp)", 'i')
+    feedkeys("\<Plug>(repeat-motion-tmp)", 'i')
 
     # Why do we reset this variable?{{{
     #
@@ -560,7 +562,7 @@ def Populate( #{{{2
         #}}}
         if motion[dir]['lhs'] =~ '\C<NL>'
             motion[dir]['lhs'] = motion[dir]['lhs']
-                ->substitute('\C<NL>', "\<c-j>", 'g')
+                ->substitute('\C<NL>', "\<C-J>", 'g')
         endif
 
     # make a built-in motion repeatable
@@ -598,7 +600,7 @@ def Populate( #{{{2
     # Its form depends on how the user wrote the motion.
     # Example:
     #
-    #     Z<c-l>
+    #     Z<C-L>
     #     Z<C-L>
     #
     # ... are different, but both describe the same keysequence.
@@ -665,7 +667,7 @@ enddef
 def GetCurrentMode(): string #{{{2
     # Why the substitutions?{{{
     #
-    #     mode(true)->substitute("[vV\<c-v>]", 'x', ''):
+    #     mode(true)->substitute("[vV\<C-V>]", 'x', ''):
     #
     #         normalize output of `mode()` to match the one of `maparg()`
     #         in case we're in visual mode
@@ -675,8 +677,8 @@ def GetCurrentMode(): string #{{{2
     #         same thing for operator-pending mode
     #}}}
     return mode(true)
-        ->substitute("[vV\<c-v>]", 'x', '')
-        ->substitute("no[vV\<c-v>]\\=", 'o', '')
+        ->substitute("[vV\<C-V>]", 'x', '')
+        ->substitute("no[vV\<C-V>]\\=", 'o', '')
 enddef
 
 def GetDirection(lhs: string, motion: dict<any>): string #{{{2
@@ -757,7 +759,7 @@ def GetMotionInfo(lhs: string): dict<any> #{{{2
         #
         #    1. go to a function containing a `:return` statement
         #    2. enter visual mode
-        #    3. press `%` on `fu`
+        #    3. press `%` on `function`
         #    4. press `;`
         #    5. press Escape
         #    6. press `;`
@@ -804,8 +806,8 @@ def InstallWrapper( #{{{2
     # `:FzMaps`.
     #}}}
     var mapcmd: string = GetMapcmd(mode, maparg)
-    exe printf('%s %s <sid>Move(%s, %s)', mapcmd, m.bwd, string(m.bwd), string(orig_rhs_bwd))
-    exe printf('%s %s <sid>Move(%s, %s)', mapcmd, m.fwd, string(m.fwd), string(orig_rhs_fwd))
+    execute printf('%s %s <SID>Move(%s, %s)', mapcmd, m.bwd, string(m.bwd), string(orig_rhs_bwd))
+    execute printf('%s %s <SID>Move(%s, %s)', mapcmd, m.fwd, string(m.fwd), string(orig_rhs_fwd))
 enddef
 
 def Maparg( #{{{2
@@ -857,9 +859,9 @@ def Maparg( #{{{2
     # Note that you may have a motion defined in a pseudo-mode for which there's
     # no mapping command:
     #
-    #     noremap <c-q> <esc>
-    #     nunmap <c-q>
-    #     map <c-q>
+    #     noremap <C-Q> <Esc>
+    #     nunmap <C-Q>
+    #     map <C-Q>
     #     ov <C-Q>       * <Esc>˜
     #     ^^
     #
@@ -870,8 +872,8 @@ def Maparg( #{{{2
     # You can also try to run this:
     #
     #     # `#restore()` should reinstall the motion via several mapping commands
-    #     MapSave('<c-q>')->MapRestore()
-    #     map <c-q>
+    #     MapSave('<C-Q>')->MapRestore()
+    #     map <C-Q>
     #     o  <C-Q>       * <Esc>˜
     #     v  <C-Q>       * <Esc>˜
     #}}}
@@ -879,10 +881,11 @@ def Maparg( #{{{2
     #                          ├────────────────────────────────┘
     #                          └ this mismatch does not cause any issue; ignore it
         echohl ErrorMsg
-        # `unsilent` in case the repmap function was invoked with `sil!` (to suppress any error when it doesn't exist)
-        unsilent echom printf("%s can't be made repeatable in '%s' mode; it's defined in '%s' mode",
+        # `unsilent` in case the repmap function was invoked with `silent!`
+        # (to suppress any error when it doesn't exist)
+        unsilent echomsg printf("%s can't be made repeatable in '%s' mode; it's defined in '%s' mode",
             name, {'': 'nvo', v: 'v'}[mode], maparg.mode)
-        unsilent echom '    ' .. from
+        unsilent echomsg '    ' .. from
         echohl NONE
         return {}
     endif
@@ -894,17 +897,17 @@ def Maparg( #{{{2
     # In the `rhs` key, `<SID>` is *not* translated.
     # OTOH, if you don't provide the `{dict}` argument, `<SID>` *is* translated.
     #}}}
-    # Why do you replace `|` with `<bar>`?{{{
+    # Why do you replace `|` with `<Bar>`?{{{
     #
     # This `rhs` key will be used in `Move()` and `MoveAgain()`.
     # Atm, a bar does not need to be escaped for `Move()`.
     # But it does for `MoveAgain()`.
     #
-    # The easiest way to support those 2 cases, is to just replace a bar with `<bar>`.
+    # The easiest way to support those 2 cases, is to just replace a bar with `<Bar>`.
     # `Move()` will translate it into a literal bar via `Translate()`.
     # And `MoveAgain()` will also translate it via an ad-hoc temporary mapping.
     #}}}
-    maparg.rhs = maparg(name, mode)->substitute('|', '<bar>', 'g')
+    maparg.rhs = maparg(name, mode)->substitute('|', '<Bar>', 'g')
     return maparg
 enddef
 
@@ -935,13 +938,13 @@ def Translate(seq: string): string #{{{2
 enddef
 
 def Unshadow(m: dict<string>, mode: string) #{{{2
-    exe 'sil! ' .. mode .. 'unmap <buffer> ' .. m.bwd
-    exe 'sil! ' .. mode .. 'unmap <buffer> ' .. m.fwd
+    execute 'silent! ' .. mode .. 'unmap <buffer> ' .. m.bwd
+    execute 'silent! ' .. mode .. 'unmap <buffer> ' .. m.fwd
 enddef
 
 def UpdateUndoFtplugin() #{{{2
     if get(b:, 'undo_ftplugin', '')->stridx('unlet! b:repeatable_motions') == -1
-        b:undo_ftplugin = get(b:, 'undo_ftplugin', 'exe')
+        b:undo_ftplugin = get(b:, 'undo_ftplugin', 'execute')
             .. '| unlet! b:repeatable_motions'
     endif
 enddef
