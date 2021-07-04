@@ -1,8 +1,5 @@
 vim9script noclear
 
-if exists('loaded') | finish | endif
-var loaded = true
-
 # Init {{{1
 
 # make sure `MapSave()` and `MapRestore()` are available
@@ -21,23 +18,19 @@ catch /^Vim\%((\a\+)\)\=:E\%(1048\|1053\):/
     #
     # MWE:
     #
-    #     $ vim -Nu NONE -S <(cat <<'EOF'
-    #         function Throw()
-    #             try
-    #                 throw 'error'
-    #             endtry
-    #         endfunction
-    #         silent! call Throw()
+    #     function Throw()
     #         try
-    #             call Unknown()
-    #         catch
+    #             throw 'error'
     #         endtry
-    #     EOF
-    #     )
-    #     ...˜
+    #     endfunction
+    #     silent! Throw()
+    #     try
+    #         Unknown()
+    #     catch
+    #     endtry
     #     E117: Unknown function: Unknown˜
-    #     " result:   'E117' is raised
-    #     " expected: 'E117' is caught
+    #     # expected: 'E117' is caught
+    #     # actual:   'E117' is raised
     #}}}
     # Why `:unsilent`?{{{
     #
@@ -236,10 +229,10 @@ def MakeRepeatable( #{{{2
     # output of  `Move('lhs')`.  That's  where the  recursion comes  from.  It's
     # like pressing `F3`, where `F3` is defined like so:
     #
-    #     nnoremap <expr> <F3> Func()
-    #     function Func()
-    #         return Func()
-    #     endfunction
+    #     nnoremap <expr> <F3> g:Func()
+    #     def g:Func(): any
+    #         return g:Func()
+    #     enddef
     #}}}
 
     var origin: string = execute(
@@ -392,24 +385,16 @@ enddef
 
 # The rhs needs to be evaluated in the legacy context.{{{
 #
-#     $ vim -Nu NONE -S <(cat <<'EOF'
-#         vim9script
-#         nnoremap <expr> <F3> {-> 'no error'}()
-#         echo maparg('<F3>')->eval()
-#     EOF
-#     )
+#     nnoremap <expr> <F3> {-> 'no error'}()
+#     echo maparg('<F3>')->eval()
 #     E720: Missing colon in Dictionary: > 'no error'}()˜
 #     E15: Invalid expression: {-> 'no error'}()˜
 #
-#     $ vim -Nu NONE -S <(cat <<'EOF'
-#         vim9script
-#         nnoremap <expr> <F3> {-> 'no error'}()
-#         function Legacy()
-#             echo maparg('<F3>')->eval()
-#         endfunction
-#         Legacy()
-#     EOF
-#     )
+#     nnoremap <expr> <F3> {-> 'no error'}()
+#     function Legacy()
+#         echo maparg('<F3>')->eval()
+#     endfunction
+#     Legacy()
 #     no error˜
 #
 # ---
@@ -475,10 +460,10 @@ def MoveAgain(dir: string) #{{{2
     # target, or repeating a previous `fx`:
     #
     #     if repmap#make#isRepeating()
-    #         " repeat last `fx`
+    #         # repeat last `fx`
     #         ...
     #     else
-    #         " ask for a target, then press `f{target}`
+    #         # ask for a target, then press `f{target}`
     #         ...
     #     endif
     #}}}
@@ -795,10 +780,10 @@ def InstallWrapper( #{{{2
     # `Move()` doesn't need it.
     # But it makes the output of `:map` more readable:
     #
-    #     " wtf does this mapping?
+    #     # wtf does this mapping?
     #     n  gt          * <SNR>34_Move('gt')
     #
-    #     " ok, this mapping moves a tab page
+    #     # ok, this mapping moves a tab page
     #     n  gt          * <SNR>34_Move('gt', '<Cmd>call <SNR>12_MoveTabpage()<CR>')
     #
     # And more  useful; without the  original rhs,  it's impossible to  find the
